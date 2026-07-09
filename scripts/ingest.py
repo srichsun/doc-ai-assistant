@@ -4,11 +4,13 @@ Usage: uv run python -m scripts.ingest [data_dir]
 """
 import sys
 
-from app import rag
+from app import config, rag
 
 
 def main():
     data_dir = sys.argv[1] if len(sys.argv) > 1 else "data"
+    print(f"Embedding provider: {config.EMBEDDING_PROVIDER} "
+          f"(collection: {config.COLLECTION_NAME})")
     counts = rag.ingest_dir(data_dir)
     if not counts:
         print(f"No supported files found in {data_dir}/")
