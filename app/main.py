@@ -11,9 +11,15 @@ class ChatRequest(BaseModel):
     question: str
 
 
+class AgentRequest(BaseModel):
+    question: str
+    session_id: str | None = None  # pass the same id to continue a conversation
+
+
 class AgentResponse(BaseModel):
     answer: str
     tools_used: list[str]
+    session_id: str | None = None
 
 
 class Source(BaseModel):
@@ -49,9 +55,12 @@ def search(q: str):
 
 
 @app.post("/agent", response_model=AgentResponse)
-def agent_endpoint(req: ChatRequest):
-    """Agent version: Claude decides which tools to call (search / order lookup)."""
-    return agent.run(req.question)
+def agent_endpoint(req: AgentRequest):
+    """Agent version: Claude decides which tools to call (search / order lookup).
+
+    Pass a session_id to keep context across follow-up questions.
+    """
+    return agent.run(req.question, session_id=req.session_id)
 
 
 @app.post("/chat", response_model=ChatResponse)

@@ -38,7 +38,26 @@ def test_agent_answers_without_tools(monkeypatch):
         lambda **kw: _reply([_text("direct answer")], "end_turn"),
     )
     result = agent.run("hi")
-    assert result == {"answer": "direct answer", "tools_used": []}
+    assert result == {"answer": "direct answer", "tools_used": [], "session_id": None}
+
+
+def test_agent_remembers_history_across_turns(monkeypatch):
+    seen_messages = []
+
+    def fake_create(**kw):
+        seen_messages.append(kw["messages"])
+        return _reply([_text("ok")], "end_turn")
+
+    monkeypatch.setattr(llm.client.messages, "create", fake_create)
+
+    agent.run("first question", session_id="s-mem")
+    agent.run("second question", session_id="s-mem")
+
+    # The second turn's request must include the first question in its history.
+    second_turn = seen_messages[-1]
+    texts = [m["content"] for m in second_turn if isinstance(m["content"], str)]
+    assert "first question" in texts
+    assert "second question" in texts
 
 
 def test_agent_calls_a_tool_then_answers(monkeypatch):
