@@ -86,8 +86,18 @@
   .v{color:var(--muted);font-size:13px;font-family:var(--mono)}
   .arr{color:var(--muted)}
   .row3{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .row2{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+  .row2{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
   .branch{display:flex;flex-direction:column;align-items:center;gap:6px}
+  /* nested "shell wraps internals" box: a tool's outer interface containing
+     what it actually does inside — one box inside another, not two peers */
+  .toolbox{width:236px;border:1.5px solid var(--line);border-radius:16px;
+    padding:12px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:2px;
+    background:rgba(255,255,255,.014)}
+  .toolbox .outer{width:100%;border:none;background:transparent;padding:2px 4px 6px;text-align:center}
+  .toolbox .outer b{font-size:14.5px}
+  .toolbox .connector{display:flex;align-items:center;gap:5px;font-family:var(--mono);
+    font-size:10.5px;color:var(--muted);margin:1px 0 3px}
+  .toolbox .inner{width:90%;padding:9px 12px;background:var(--bg)}
   .loopbox{border:1px dashed var(--line);border-radius:16px;padding:16px 16px 12px;margin:4px 0;width:100%;
     max-width:540px;display:flex;flex-direction:column;align-items:center;gap:6px}
   .looplabel{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;color:var(--accent2)}
@@ -177,14 +187,18 @@
         <span class="v">↓ <span data-en="calls a tool" data-zh="呼叫工具"></span></span>
         <div class="row2">
           <div class="branch">
-            <button class="node" data-node="search"><b>search_documents</b><small>tools.py</small></button>
-            <span class="v">↓</span>
-            <button class="node" data-node="retrieve"><b>retrieve → Chroma</b><small>rag.py · store.py</small></button>
+            <div class="toolbox">
+              <button class="node outer" data-node="search"><b>search_documents</b><small>tools.py</small></button>
+              <div class="connector">↓ <span data-en="internally calls" data-zh="內部呼叫"></span></div>
+              <button class="node inner" data-node="retrieve"><b>retrieve → Chroma</b><small>rag.py · store.py</small></button>
+            </div>
           </div>
           <div class="branch">
-            <button class="node" data-node="order"><b>lookup_order</b><small>tools.py</small></button>
-            <span class="v">↓</span>
-            <div class="node ghost"><b>order table</b><small data-en="fake DB" data-zh="假訂單表"></small></div>
+            <div class="toolbox">
+              <button class="node outer" data-node="order"><b>lookup_order</b><small>tools.py</small></button>
+              <div class="connector">↓ <span data-en="internally reads" data-zh="內部讀取"></span></div>
+              <div class="node ghost inner"><b data-en="order table" data-zh="訂單表"></b><small data-en="fake DB" data-zh="假訂單表"></small></div>
+            </div>
           </div>
         </div>
         <div class="loopback" data-en="↺ tool result goes back to Claude" data-zh="↺ 工具結果送回 Claude"></div>
@@ -292,14 +306,14 @@
       en:["Claude — the brain","Given the question and the tool list, it decides: answer now, or call a tool first — and which one."],
       zh:["Claude — 大腦","拿到問題和工具清單後，它決定：直接回答，還是先呼叫某個工具（哪一個）。"]},
     search:{file:"app/tools.py",
-      en:["search_documents tool","Searches the knowledge base: runs retrieval and returns the matching passages back to Claude."],
-      zh:["search_documents 工具","搜尋知識庫：呼叫檢索、把命中的段落回傳給 Claude。"]},
+      en:["search_documents — the interface Claude sees","This is the whole tool call, from Claude's side: give it a query, get matching passages back. What happens inside (retrieve → Chroma, below) is an implementation detail Claude never sees."],
+      zh:["search_documents —— Claude 看到的介面","這就是完整的一次工具呼叫，從 Claude 的角度看：給它 query，拿回命中的段落。裡面實際發生的事（下面的 retrieve → Chroma）是 Claude 看不到的實作細節。"]},
     retrieve:{file:"app/rag.py · app/store.py",
-      en:["retrieve → Chroma","Embeds the question and asks Chroma for the most similar chunks. Runs locally, no API key."],
-      zh:["retrieve → Chroma","把問題轉成向量，向 Chroma 要最相似的片段。本地跑，免 API key。"]},
+      en:["retrieve → Chroma — what search_documents does inside","Not a separate step — this runs inside the tool call above. Embeds the question and asks Chroma for the most similar chunks. Runs locally, no API key."],
+      zh:["retrieve → Chroma —— search_documents 內部在做的事","不是另外一步 —— 這是在上面那次工具呼叫「裡面」跑的。把問題轉成向量，向 Chroma 要最相似的片段。本地跑，免 API key。"]},
     order:{file:"app/tools.py",
-      en:["lookup_order tool","A second tool: looks up an order by id in a small fake table — showing the agent can call non-document tools too."],
-      zh:["lookup_order 工具","第二個工具：用訂單編號在一張假訂單表裡查 —— 示範 agent 也能呼叫非文件類工具。"]},
+      en:["lookup_order — a second, non-document tool","Same shape as search_documents: an interface Claude calls, which internally reads a small fake order table. Shows the agent isn't limited to document search."],
+      zh:["lookup_order —— 第二個非文件類工具","跟 search_documents 同樣的結構：Claude 呼叫的介面，內部讀一張假訂單表。示範 agent 不是只能查文件。"]},
     answer:{file:"app/agent.py → app/main.py",
       en:["Answer + sources","Claude's final answer, plus which tools it used and which documents it searched — returned as JSON to the UI."],
       zh:["答案 + 來源","Claude 的最終答案，加上用了哪些工具、查了哪些文件 —— 以 JSON 回傳前端。"]}
