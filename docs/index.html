@@ -65,6 +65,38 @@
   ul.clean li{padding:12px 0;border-top:1px solid var(--line);color:var(--muted)}
   ul.clean li b{color:var(--text)}
   footer{padding:40px 0 64px;color:var(--muted);font-size:14px}
+  /* architecture diagram */
+  .archwrap{display:grid;grid-template-columns:1fr 290px;gap:26px;margin-top:28px}
+  @media(max-width:760px){.archwrap{grid-template-columns:1fr}}
+  .diagram{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .lane-h{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);align-self:flex-start;margin:6px 0}
+  .node{appearance:none;font-family:inherit;text-align:center;cursor:pointer;color:var(--text);
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 16px;
+    min-width:220px;display:flex;flex-direction:column;gap:2px;
+    transition:border-color .2s,box-shadow .2s,transform .1s}
+  .node b{font-size:15px}
+  .node small{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .node:hover{border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 22px rgba(94,234,212,.22);transform:translateY(-1px)}
+  .node.hot small{color:var(--accent2)}
+  .node.done{border-color:rgba(94,234,212,.5)}
+  .node.ghost{min-width:0;padding:8px 12px;background:transparent;cursor:default}
+  .node.ghost b{font-size:13px;font-weight:600}
+  .v{color:var(--muted);font-size:13px;font-family:var(--mono)}
+  .arr{color:var(--muted)}
+  .row3{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row2{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+  .branch{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .loopbox{border:1px dashed var(--line);border-radius:16px;padding:16px 16px 12px;margin:4px 0;width:100%;
+    max-width:540px;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .looplabel{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;color:var(--accent2)}
+  .loopback{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:8px}
+  .detail{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:20px;
+    align-self:start;position:sticky;top:76px}
+  .detail .dt-file{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:8px;word-break:break-all}
+  .detail h3{margin:0 0 8px;font-size:17px}
+  .detail p{margin:0;color:var(--muted);font-size:14.5px}
   .hide{display:none!important}
 </style>
 </head>
@@ -73,6 +105,7 @@
   <div class="brand">Doc<span>·</span>AI</div>
   <div class="links">
     <a href="#overview" data-en="Overview" data-zh="總覽"></a>
+    <a href="#architecture" data-en="Architecture" data-zh="架構"></a>
     <a href="#agent" data-en="Agent" data-zh="Agent"></a>
     <a href="#rag" data-en="RAG vs Agent" data-zh="RAG vs Agent"></a>
     <a href="#stack" data-en="Stack" data-zh="技術"></a>
@@ -114,6 +147,61 @@
       <h3 data-en="Conversation memory" data-zh="對話記憶"></h3>
       <p data-en="Pass a session id and follow-ups keep their context — &quot;when will it arrive?&quot; still knows which order you meant." data-zh="帶上 session id，追問就能延續上下文 —— 「它幾號到？」還記得你指的是哪張訂單。"></p></div>
   </div>
+</div></section>
+
+<section id="architecture"><div class="wrap">
+  <div class="sec-h" data-en="Architecture" data-zh="架構"></div>
+  <h2 data-en="How a question flows through the system" data-zh="一個問題怎麼在系統裡流動"></h2>
+  <p class="lede" style="font-size:16px" data-en="Click any box to see what it does and which file it lives in — or trace a full request." data-zh="點任一方塊看它做什麼、在哪個檔案 —— 或追蹤一次完整請求。"></p>
+
+  <div class="archwrap">
+    <div class="diagram">
+      <div class="lane-h" data-en="Offline — ingest (runs once)" data-zh="離線 — 灌入（跑一次）"></div>
+      <div class="row3">
+        <button class="node ghost" data-node="data"><b>data/</b><small>*.md · *.pdf</small></button>
+        <span class="arr">→</span>
+        <button class="node ghost" data-node="chunk"><b>chunk + embed</b><small>rag.py</small></button>
+        <span class="arr">→</span>
+        <button class="node ghost" data-node="store"><b>Chroma</b><small>store.py</small></button>
+      </div>
+
+      <div class="lane-h" style="margin-top:22px" data-en="Per request — a question" data-zh="每次請求 — 一個問題"></div>
+      <button class="node" data-node="ui"><b>React UI</b><small>App.jsx</small></button>
+      <span class="v">↓</span>
+      <button class="node" data-node="api"><b>FastAPI · /agent</b><small>main.py</small></button>
+      <span class="v">↓</span>
+
+      <div class="loopbox">
+        <div class="looplabel" data-en="Agent loop — repeats until Claude answers" data-zh="Agent 迴圈 — 重複到 Claude 回答為止"></div>
+        <button class="node hot" data-node="claude"><b>Claude</b><small>llm.py · decides</small></button>
+        <span class="v">↓ <span data-en="calls a tool" data-zh="呼叫工具"></span></span>
+        <div class="row2">
+          <div class="branch">
+            <button class="node" data-node="search"><b>search_documents</b><small>tools.py</small></button>
+            <span class="v">↓</span>
+            <button class="node" data-node="retrieve"><b>retrieve → Chroma</b><small>rag.py · store.py</small></button>
+          </div>
+          <div class="branch">
+            <button class="node" data-node="order"><b>lookup_order</b><small>tools.py</small></button>
+            <span class="v">↓</span>
+            <div class="node ghost"><b>order table</b><small data-en="fake DB" data-zh="假訂單表"></small></div>
+          </div>
+        </div>
+        <div class="loopback" data-en="↺ tool result goes back to Claude" data-zh="↺ 工具結果送回 Claude"></div>
+      </div>
+
+      <span class="v">↓</span>
+      <button class="node done" data-node="answer"><b>Answer + sources</b><small>→ UI</small></button>
+    </div>
+
+    <aside class="detail">
+      <div class="dt-file" id="dtFile"></div>
+      <h3 id="dtTitle"></h3>
+      <p id="dtBody"></p>
+    </aside>
+  </div>
+
+  <button class="btn primary" id="traceBtn" style="margin-top:24px" data-en="▶ Trace a request" data-zh="▶ 追蹤一次請求"></button>
 </div></section>
 
 <section id="agent"><div class="wrap">
@@ -181,15 +269,85 @@
 (function(){
   var lang = "en";
   var els = document.querySelectorAll("[data-en]");
+  var currentNode = "ui";
+
+  // What each box does + which file it lives in. [title, description] per language.
+  var NODES = {
+    data:{file:"data/*.md · *.pdf",
+      en:["Source documents","Your source files. Read once, offline, before any question is asked."],
+      zh:["來源文件","你的來源文件。在被問問題之前，離線讀取一次。"]},
+    chunk:{file:"app/rag.py · scripts/ingest.py",
+      en:["Chunk + embed","Splits documents into paragraph-aware chunks, turns each into a vector, and stores them."],
+      zh:["切塊 + embed","把文件切成段落感知的 chunk，各自轉成向量後存起來。"]},
+    store:{file:"app/store.py",
+      en:["Chroma — vector store","The embedded vector database. Holds the chunk vectors; there is no external DB to run."],
+      zh:["Chroma — 向量庫","內嵌的向量資料庫。存放 chunk 向量；不用另外架 DB。"]},
+    ui:{file:"frontend/src/App.jsx",
+      en:["React UI","The browser chat. You type a question; it POSTs to /agent and renders the answer plus the tool and source tags."],
+      zh:["React 前端","瀏覽器聊天畫面。你輸入問題，它 POST /agent，並把答案和工具/來源標籤畫出來。"]},
+    api:{file:"app/main.py",
+      en:["FastAPI · /agent","The web layer. Receives the request, applies CORS, validates it with Pydantic, and hands the question to the agent."],
+      zh:["FastAPI · /agent","Web 層。接收請求、處理 CORS、用 Pydantic 驗證，再把問題交給 agent。"]},
+    claude:{file:"app/llm.py",
+      en:["Claude — the brain","Given the question and the tool list, it decides: answer now, or call a tool first — and which one."],
+      zh:["Claude — 大腦","拿到問題和工具清單後，它決定：直接回答，還是先呼叫某個工具（哪一個）。"]},
+    search:{file:"app/tools.py",
+      en:["search_documents tool","Searches the knowledge base: runs retrieval and returns the matching passages back to Claude."],
+      zh:["search_documents 工具","搜尋知識庫：呼叫檢索、把命中的段落回傳給 Claude。"]},
+    retrieve:{file:"app/rag.py · app/store.py",
+      en:["retrieve → Chroma","Embeds the question and asks Chroma for the most similar chunks. Runs locally, no API key."],
+      zh:["retrieve → Chroma","把問題轉成向量，向 Chroma 要最相似的片段。本地跑，免 API key。"]},
+    order:{file:"app/tools.py",
+      en:["lookup_order tool","A second tool: looks up an order by id in a small fake table — showing the agent can call non-document tools too."],
+      zh:["lookup_order 工具","第二個工具：用訂單編號在一張假訂單表裡查 —— 示範 agent 也能呼叫非文件類工具。"]},
+    answer:{file:"app/agent.py → app/main.py",
+      en:["Answer + sources","Claude's final answer, plus which tools it used and which documents it searched — returned as JSON to the UI."],
+      zh:["答案 + 來源","Claude 的最終答案，加上用了哪些工具、查了哪些文件 —— 以 JSON 回傳前端。"]}
+  };
+
+  function renderDetail(id){
+    var n = NODES[id]; if(!n) return;
+    document.getElementById("dtFile").textContent = n.file;
+    document.getElementById("dtTitle").textContent = n[lang][0];
+    document.getElementById("dtBody").textContent = n[lang][1];
+    document.querySelectorAll(".node").forEach(function(el){
+      el.classList.toggle("active", el.getAttribute("data-node") === id);
+    });
+  }
+
   function apply(){
     document.documentElement.setAttribute("data-lang", lang);
-    document.documentElement.lang = (lang==="zh")?"zh-Hant":"en";
+    document.documentElement.lang = (lang==="zh") ? "zh-Hant" : "en";
     els.forEach(function(el){ el.innerHTML = el.getAttribute("data-"+lang); });
     document.getElementById("langBtn").textContent = (lang==="en") ? "中文" : "English";
+    renderDetail(currentNode);
   }
+
   document.getElementById("langBtn").addEventListener("click", function(){
     lang = (lang==="en") ? "zh" : "en"; apply();
   });
+
+  // Click a box → show its detail.
+  document.querySelectorAll(".node[data-node]").forEach(function(el){
+    el.addEventListener("click", function(){
+      currentNode = el.getAttribute("data-node");
+      renderDetail(currentNode);
+    });
+  });
+
+  // Trace: light up the boxes along a real request, in order (Claude appears
+  // twice because the loop returns to it before answering).
+  var TRACE = ["ui","api","claude","search","retrieve","claude","answer"];
+  var timers = [];
+  document.getElementById("traceBtn").addEventListener("click", function(){
+    timers.forEach(clearTimeout); timers = [];
+    TRACE.forEach(function(id, i){
+      timers.push(setTimeout(function(){
+        currentNode = id; renderDetail(id);
+      }, i * 850));
+    });
+  });
+
   apply();
 })();
 </script>
