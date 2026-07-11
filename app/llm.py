@@ -3,8 +3,8 @@ import anthropic
 
 from app import config
 
-# 60s timeout so a hung request fails fast instead of blocking the worker.
-client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, timeout=60.0)
+# 30s timeout so a hung request fails fast instead of blocking the worker.
+client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, timeout=30.0)
 
 
 def generate(prompt: str, system: str | None = None) -> str:
