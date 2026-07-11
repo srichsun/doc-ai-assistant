@@ -41,6 +41,7 @@ def run(question: str, session_id: str | None = None) -> dict:
         # Record the assistant turn either way, so history stays complete.
         messages.append({"role": "assistant", "content": response.content})
 
+        # Claude didn't ask for a tool, so it has enough to answer now — done.
         if response.stop_reason != "tool_use":
             answer = "".join(b.text for b in response.content if b.type == "text")
             if session_id:
