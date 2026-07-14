@@ -29,6 +29,7 @@ def run(question: str, session_id: str | None = None) -> dict:
     messages.append({"role": "user", "content": question})
     tools_used: list[str] = []
     sources: list[str] = []  # document filenames the agent searched, deduped
+    seen_sources: set[str] = set()  # fast membership check for the dedup above
 
     for _ in range(MAX_STEPS):
         response = llm.client.messages.create(
@@ -64,7 +65,8 @@ def run(question: str, session_id: str | None = None) -> dict:
                     # the tool result text (Claude) — avoids querying twice.
                     hits = rag.retrieve(block.input.get("query", ""))
                     for hit in hits:
-                        if hit["source"] not in sources:
+                        if hit["source"] not in seen_sources:
+                            seen_sources.add(hit["source"])
                             sources.append(hit["source"])
                     content = tools.format_hits(hits)
                 else:
