@@ -36,7 +36,7 @@ source** — which is exactly what companies build in-house.
 
 - **Embeddings** run locally via Chroma's built-in model — no API key needed to
   ingest or retrieve.
-- Only the **answer generation** step (`/chat`) calls the Anthropic API.
+- Only the **answer generation** step (`/agent`) calls the Anthropic API.
 
 ## Tech choices
 
@@ -53,10 +53,10 @@ source** — which is exactly what companies build in-house.
 ```
 app/
   config.py   settings from env / .env
-  main.py     FastAPI routes: /health, /search, /chat, /agent
-  llm.py      Anthropic client + simple generate() helper
+  main.py     FastAPI routes: /health, /search, /agent
+  llm.py      shared Anthropic client
   store.py    Chroma client + pluggable embedding provider
-  rag.py      read/chunk/ingest + retrieve + prompt building
+  rag.py      read/chunk/ingest + retrieve
   tools.py    agent tools: search_documents, lookup_order
   agent.py    tool-use loop (Claude picks the tools)
   sessions.py in-memory conversation history
@@ -72,7 +72,7 @@ tests/         pytest (LLM + retrieval mocked, no API key needed)
 # 1. install deps (uv creates the venv from the lockfile)
 uv sync
 
-# 2. add your Anthropic key (only needed for /chat)
+# 2. add your Anthropic key (only needed for /agent)
 cp .env.example .env         # then edit .env and paste your key
 
 # 3. load documents into the vector store (downloads the embedding model once)
@@ -90,36 +90,24 @@ Open http://127.0.0.1:8000/docs for the interactive Swagger UI.
 |--------|--------------|-------------|
 | GET    | `/health`    | Liveness check. |
 | GET    | `/search?q=` | Return the top-k retrieved chunks (retrieval sanity check; no LLM, no key). |
-| POST   | `/chat`      | Fixed RAG: retrieve → answer. `{"question"}` → `{"answer", "sources"}`. |
-| POST   | `/agent`     | Agent: Claude picks tools. `{"question", "session_id?"}` → `{"answer", "tools_used", "session_id"}`. |
+| POST   | `/agent`     | Agent: Claude picks tools. `{"question", "session_id?"}` → `{"answer", "tools_used", "sources", "session_id"}`. |
 
-Both `/chat` and `/agent` require `ANTHROPIC_API_KEY`.
+`/agent` requires `ANTHROPIC_API_KEY`.
 
 ```bash
-curl -X POST http://127.0.0.1:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question": "How much does an iPhone screen repair cost with AppleCare?"}'
-
 curl -X POST http://127.0.0.1:8000/agent \
   -H "Content-Type: application/json" \
   -d '{"question": "What is the status of order 1001, and can I still return it?"}'
 ```
 
-## RAG (`/chat`) vs Agent (`/agent`)
+## How the agent decides
 
-Both answer questions from the same knowledge base; the difference is **who
-controls the flow**.
-
-- **`/chat` (RAG)** runs a *fixed* pipeline: always retrieve, then answer. Simple
-  and predictable — good when every question is "look something up in the docs".
-- **`/agent`** exposes retrieval as a `search_documents` **tool** (plus a
-  `lookup_order` tool) and lets Claude decide *which* tools to call and *how many
-  times*. A question like "what's the status of order 1001 and can I return it?"
-  makes the agent call **both** tools on its own. It also keeps conversation
-  memory via `session_id`, so follow-ups ("when will it arrive?") keep context.
-
-The agent is a natural *layer on top of* the RAG retrieval — same retrieval code,
-wrapped as a tool.
+Retrieval is exposed as a `search_documents` **tool** (plus a `lookup_order`
+tool), and Claude decides *which* tools to call and *how many times* — not a
+fixed "always retrieve, then answer" pipeline. A question like "what's the
+status of order 1001 and can I return it?" makes the agent call **both**
+tools on its own. It also keeps conversation memory via `session_id`, so
+follow-ups ("when will it arrive?") keep context.
 
 ## Design decisions & trade-offs
 
@@ -130,8 +118,9 @@ wrapped as a tool.
   every N characters keeps chunks as clean semantic units and measurably lowered
   retrieval distance on sample queries.
 - **Grounded answers** — the system prompt tells the model to answer only from
-  retrieved context and say "I don't know" otherwise, which avoids hallucinated
-  policy answers. `/chat` returns the sources so answers are auditable.
+  tool results and say "I don't know" otherwise, which avoids hallucinated
+  policy answers. `/agent` returns the sources it searched so answers are
+  auditable.
 - **In-memory sessions** — fine for a demo; a real deployment would use Redis or
   a database so history survives restarts and scales across workers.
 
@@ -159,8 +148,9 @@ The LLM call and retrieval are mocked, so the suite runs without an API key.
 ## Roadmap
 
 Done: pluggable embeddings, paragraph-aware chunking, the agent (tool use),
-and multi-turn memory. Still to do:
+multi-turn memory, and a React chat frontend with tool/source citations.
+Still to do:
 
-- Add a small web UI (React chat widget) on top of the API.
-- Deploy a live demo to Hugging Face Spaces (deferred — a public `/chat`
-  spends the owner's API key, so it needs a gate first).
+- PDF upload UI (plus a backend `/ingest` endpoint).
+- Deploy a live demo (deferred — a public `/agent` spends the owner's API
+  key, so it needs a gate first).

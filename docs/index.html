@@ -117,7 +117,6 @@
     <a href="#overview" data-en="Overview" data-zh="總覽"></a>
     <a href="#architecture" data-en="Architecture" data-zh="架構"></a>
     <a href="#agent" data-en="Agent" data-zh="Agent"></a>
-    <a href="#rag" data-en="RAG vs Agent" data-zh="RAG vs Agent"></a>
     <a href="#stack" data-en="Stack" data-zh="技術"></a>
   </div>
   <span class="langtoggle" id="langBtn">中文</span>
@@ -233,20 +232,6 @@
 → tools_used: [ &quot;lookup_order&quot;, &quot;search_documents&quot; ]
 → answer:     訂單 1001 七月二號出貨、五號到；收到後
               14 天內可退 …"></pre>
-</div></section>
-
-<section id="rag"><div class="wrap">
-  <div class="sec-h" data-en="Two endpoints, one knowledge base" data-zh="兩個 endpoint，同一個知識庫"></div>
-  <h2 data-en="RAG vs Agent — who controls the flow" data-zh="RAG vs Agent —— 誰掌控流程"></h2>
-  <div class="grid">
-    <div class="card">
-      <h3><code>/chat</code> — RAG</h3>
-      <p data-en="A fixed pipeline: always retrieve, then answer. Simple and predictable — when every question is &quot;look something up in the docs&quot;." data-zh="固定流程：一定先檢索，再回答。簡單、可預測 —— 當每個問題都是「去文件裡查一件事」時。"></p></div>
-    <div class="card">
-      <h3><code>/agent</code> — Agent</h3>
-      <p data-en="Same retrieval, exposed as a tool. The model chooses when to search, when to look up an order, and when it has enough to answer." data-zh="同一份檢索，包成工具。模型自己決定何時搜尋、何時查訂單、何時資訊夠了可以回答。"></p></div>
-  </div>
-  <p class="flow" style="margin-top:20px" data-en="The agent is a natural layer on top of the RAG retrieval — the same retrieval code, wrapped as a tool." data-zh="Agent 是 RAG 檢索之上很自然的一層 —— 同一份檢索 code，包成工具而已。"></p>
 </div></section>
 
 <section id="decisions"><div class="wrap">
