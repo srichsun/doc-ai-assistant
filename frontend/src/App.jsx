@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import "./App.css";
 import {
   getIdToken,
@@ -6,6 +7,11 @@ import {
   signInWithGoogle,
   signOutUser,
 } from "./firebase";
+
+// A tiny silent clip used to "unlock" the audio element inside a tap, so the
+// browser (iOS Safari, Chrome) lets the reply — fetched a moment later — play.
+const SILENT =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
 
 // Where the FastAPI backend runs. In the deployed build the frontend is served
 // by the same server, so VITE_API_BASE is "" (same origin); local dev falls
@@ -67,6 +73,32 @@ export default function App() {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // When signed in, load today's conversation so the screen isn't blank each
+  // visit — each saved entry becomes a user turn followed by the coach's reply.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch(`${API}/entries`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setMessages(
+          (data.entries || []).flatMap((e) => [
+            { role: "user", text: e.transcript },
+            { role: "assistant", text: e.ai_reply },
+          ]),
+        );
+      } catch {
+        /* ignore — just start with an empty screen */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   // Read one reply aloud — called from a tap on its speaker button. Tapping the
   // same button again while it's playing stops it.
   async function playReply(text, idx) {
@@ -75,6 +107,14 @@ export default function App() {
       a.pause();
       setSpeakingIdx(null);
       return;
+    }
+    // Unlock playback NOW, synchronously inside the tap — browsers block a
+    // play() called later (after the await), which is why sound was missing.
+    try {
+      a.src = SILENT;
+      a.play().catch(() => {});
+    } catch {
+      /* ignore */
     }
     try {
       setSpeakingIdx(idx);
@@ -204,7 +244,13 @@ export default function App() {
 
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.role}`}>
-            {m.text}
+            {m.role === "assistant" ? (
+              <div className="md">
+                <ReactMarkdown>{m.text}</ReactMarkdown>
+              </div>
+            ) : (
+              m.text
+            )}
             {m.role === "assistant" && m.text && (
               <button
                 type="button"

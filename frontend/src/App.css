@@ -228,3 +228,28 @@
   cursor: pointer;
 }
 .msg .speak:hover { color: var(--gold); border-color: var(--gold); }
+
+/* Markdown rendering inside assistant bubbles — lists, bold, headers. */
+.msg .md > *:first-child { margin-top: 0; }
+.msg .md > *:last-child { margin-bottom: 0; }
+.msg .md p { margin: 0 0 10px; }
+.msg .md ul, .msg .md ol { margin: 8px 0 12px; padding-left: 20px; }
+.msg .md li { margin: 4px 0; }
+.msg .md strong { color: var(--gold); font-weight: 600; }
+.msg .md h1, .msg .md h2, .msg .md h3 {
+  font-size: 15px;
+  margin: 16px 0 8px;
+  color: var(--gold);
+}
+.msg .md blockquote {
+  margin: 10px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--gold);
+  color: var(--muted);
+}
+.msg .md code {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+}

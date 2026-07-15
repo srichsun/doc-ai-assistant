@@ -10,7 +10,9 @@ load_dotenv()
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "claude-haiku-4-5")          # used if anthropic
-OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o")      # used if openai
+# gpt-5.x-chat-latest is the model family that powers ChatGPT itself — the
+# warm, structured style the product is known for. (gpt-4o was two+ years old.)
+OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-5.3-chat-latest")
 # Effectively uncapped so the coach can write long, unhurried, detailed
 # reflections. This is a ceiling, not a target — length is driven by the prompt.
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
