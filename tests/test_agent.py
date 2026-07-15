@@ -18,7 +18,7 @@ def _coach_with(replies):
     recall tool); these tests only exercise plain replies and memory.
     """
     fake = GenericFakeChatModel(messages=iter([AIMessage(r) for r in replies]))
-    return agent.build_agent(fake, tools=[])
+    return agent.build_agent(fake, tools=[], middleware=[])
 
 
 # --- coach agent ---

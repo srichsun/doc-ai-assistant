@@ -11,11 +11,12 @@ past journal entries mid-conversation (semantic memory over pgvector).
 import uuid
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import dynamic_prompt
 from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel, Field
 
-from app import config, entries, recall
+from app import config, entries, profile, recall
 
 SYSTEM_PROMPT = (
     "You are a warm, encouraging personal life coach and journaling companion. "
@@ -40,19 +41,40 @@ def _default_model() -> ChatAnthropic:
     )
 
 
-def build_agent(model, tools=None):
+@dynamic_prompt
+def _with_profile(request) -> str:
+    """Prepend the person's long-term profile to the system prompt each turn,
+    so the coach always talks with the freshest sense of who they are.
+
+    Runs at model-call time; if the profile can't be read we just fall back to
+    the base prompt rather than break the conversation.
+    """
+    try:
+        summary = profile.get_profile()
+    except Exception:
+        summary = ""
+    if not summary:
+        return SYSTEM_PROMPT
+    return f"{SYSTEM_PROMPT}\n\nWhat you already know about this person:\n{summary}"
+
+
+def build_agent(model, tools=None, middleware=None):
     """Wrap a chat model into a coach agent with memory.
 
     Split out so tests can pass a fake, offline model instead of real Claude.
-    Tests also pass tools=[] because the fake model can't bind tools; the real
-    coach defaults to the recall tool.
+    Tests pass tools=[] (the fake model can't bind tools) and middleware=[]
+    (so no profile lookup hits the database); the real coach defaults to the
+    recall tool and the profile-injecting middleware.
     """
     if tools is None:
         tools = [recall.search_past_entries]
+    if middleware is None:
+        middleware = [_with_profile]
     return create_agent(
         model,
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
+        middleware=middleware,
         checkpointer=InMemorySaver(),
     )
 
@@ -138,6 +160,11 @@ def chat_and_log(message: str, session_id: str | None = None) -> dict:
     # (no key, vector store down) must not lose the entry we just saved.
     try:
         recall.index_entry(entry_id, message)
+    except Exception:
+        pass
+    # Periodically re-condense the long-term profile from recent entries.
+    try:
+        profile.maybe_refresh()
     except Exception:
         pass
     return result

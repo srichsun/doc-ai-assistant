@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from app import agent, entries, voice
+from app import agent, entries, profile, voice
 
 app = FastAPI(title="Daily Coach")
 
@@ -98,3 +98,16 @@ def entries_on_day(day: str | None = None):
 def wins():
     """List the most recent entries where the coach recorded a win."""
     return {"wins": [_entry_dict(r) for r in entries.recent_wins()]}
+
+
+@app.get("/profile")
+def get_profile():
+    """The long-term profile the coach has built up about the person."""
+    return {"profile": profile.get_profile()}
+
+
+@app.post("/profile/refresh")
+def refresh_profile():
+    """Force a re-condense of the profile from recent entries (normally this
+    happens on its own every few entries)."""
+    return {"profile": profile.refresh_profile()}

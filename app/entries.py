@@ -6,7 +6,7 @@ with pgvector.)
 """
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app import db
 from app.models import Entry
@@ -48,6 +48,19 @@ def entries_on(day: date) -> list[Entry]:
             .order_by(Entry.created_at)
         )
         return list(s.scalars(stmt))
+
+
+def recent_entries(limit: int = 30) -> list[Entry]:
+    """The most recent entries, newest first — raw material for the profile."""
+    with db.get_session() as s:
+        stmt = select(Entry).order_by(Entry.created_at.desc()).limit(limit)
+        return list(s.scalars(stmt))
+
+
+def count_entries() -> int:
+    """Total number of journal entries."""
+    with db.get_session() as s:
+        return s.scalar(select(func.count()).select_from(Entry)) or 0
 
 
 def recent_wins(limit: int = 20) -> list[Entry]:
