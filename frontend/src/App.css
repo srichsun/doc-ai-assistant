@@ -175,3 +175,42 @@
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.6; }
 }
+
+/* --- Auth: sign-in gate + header user row --- */
+.app.gate {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 28px;
+}
+.google {
+  background: var(--gold);
+  color: #1a1200;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.google:hover { opacity: 0.92; }
+
+.head .who {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.signout {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.signout:hover { color: var(--gold); border-color: var(--gold); }

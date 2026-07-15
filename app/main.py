@@ -1,12 +1,12 @@
 """FastAPI entrypoint for the life-coach journaling app."""
 from datetime import date, datetime, timezone
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from app import agent, entries, profile, voice
+from app import agent, auth, entries, profile, voice
 
 app = FastAPI(title="Daily Coach")
 
@@ -56,25 +56,29 @@ def health():
 
 
 @app.post("/agent", response_model=TalkResponse)
-def agent_endpoint(req: TalkRequest):
+def agent_endpoint(req: TalkRequest, uid: str = Depends(auth.current_user)):
     """Talk to the coach. The exchange is saved as a journal entry.
 
-    Pass a session_id to keep memory across follow-ups.
+    Requires sign-in; pass a session_id to keep memory across follow-ups.
     """
-    return agent.chat_and_log(req.question, session_id=req.session_id)
+    return agent.chat_and_log(req.question, user_id=uid, session_id=req.session_id)
 
 
 @app.post("/talk", response_model=TalkResponse)
-async def talk(audio: UploadFile = File(...), session_id: str | None = Form(None)):
+async def talk(
+    audio: UploadFile = File(...),
+    session_id: str | None = Form(None),
+    uid: str = Depends(auth.current_user),
+):
     """Speak to the coach: upload recorded audio, get a reply.
 
     Whisper turns the audio into text, the coach replies, and the exchange is
     saved just like a typed one. The reply text is returned; the browser can
-    call /speak to hear it.
+    call /speak to hear it. Requires sign-in.
     """
     data = await audio.read()
     text = voice.transcribe(data, audio.filename or "audio.webm")
-    result = agent.chat_and_log(text, session_id=session_id)
+    result = agent.chat_and_log(text, user_id=uid, session_id=session_id)
     result["transcript"] = text
     return result
 
@@ -87,27 +91,27 @@ def speak(req: SpeakRequest):
 
 
 @app.get("/entries")
-def entries_on_day(day: str | None = None):
+def entries_on_day(day: str | None = None, uid: str = Depends(auth.current_user)):
     """Recall one day's entries. `day` is YYYY-MM-DD; defaults to today (UTC)."""
     d = date.fromisoformat(day) if day else datetime.now(timezone.utc).date()
-    rows = entries.entries_on(d)
+    rows = entries.entries_on(d, user_id=uid)
     return {"day": d.isoformat(), "entries": [_entry_dict(r) for r in rows]}
 
 
 @app.get("/wins")
-def wins():
+def wins(uid: str = Depends(auth.current_user)):
     """List the most recent entries where the coach recorded a win."""
-    return {"wins": [_entry_dict(r) for r in entries.recent_wins()]}
+    return {"wins": [_entry_dict(r) for r in entries.recent_wins(user_id=uid)]}
 
 
 @app.get("/profile")
-def get_profile():
+def get_profile(uid: str = Depends(auth.current_user)):
     """The long-term profile the coach has built up about the person."""
-    return {"profile": profile.get_profile()}
+    return {"profile": profile.get_profile(uid)}
 
 
 @app.post("/profile/refresh")
-def refresh_profile():
+def refresh_profile(uid: str = Depends(auth.current_user)):
     """Force a re-condense of the profile from recent entries (normally this
     happens on its own every few entries)."""
-    return {"profile": profile.refresh_profile()}
+    return {"profile": profile.refresh_profile(uid)}

@@ -16,7 +16,7 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel, Field
 
-from app import config, entries, profile, recall
+from app import auth, config, entries, profile, recall
 
 SYSTEM_PROMPT = (
     "You are a warm, encouraging personal life coach and journaling companion. "
@@ -50,7 +50,7 @@ def _with_profile(request) -> str:
     the base prompt rather than break the conversation.
     """
     try:
-        summary = profile.get_profile()
+        summary = profile.get_profile(auth.current_uid.get())
     except Exception:
         summary = ""
     if not summary:
@@ -135,13 +135,19 @@ def extract_tags(transcript: str, reply: str) -> EntryTags:
     return _extractor.invoke(prompt)
 
 
-def chat_and_log(message: str, session_id: str | None = None) -> dict:
+def chat_and_log(
+    message: str, user_id: str | None = None, session_id: str | None = None
+) -> dict:
     """Reply as the coach, then save the exchange as a journal entry.
 
     Every turn is saved on purpose — that's the whole point (unlike ChatGPT,
-    nothing is forgotten). If tag extraction fails, we still save the raw
-    exchange with empty tags rather than lose it.
+    nothing is forgotten). Everything is scoped to user_id so accounts stay
+    separate. If tag extraction fails, we still save the raw exchange with
+    empty tags rather than lose it.
     """
+    # Make the signed-in user visible to the agent's tools and profile
+    # injection for the duration of this call.
+    auth.current_uid.set(user_id)
     result = run(message, session_id)
     reply = result["answer"]
     try:
@@ -151,6 +157,7 @@ def chat_and_log(message: str, session_id: str | None = None) -> dict:
     entry_id = entries.save_entry(
         transcript=message,
         ai_reply=reply,
+        user_id=user_id,
         session_id=session_id,
         mood=tags.mood,
         wins=tags.wins,
@@ -159,12 +166,12 @@ def chat_and_log(message: str, session_id: str | None = None) -> dict:
     # Embed the entry so future conversations can recall it. A failure here
     # (no key, vector store down) must not lose the entry we just saved.
     try:
-        recall.index_entry(entry_id, message)
+        recall.index_entry(entry_id, message, user_id=user_id)
     except Exception:
         pass
     # Periodically re-condense the long-term profile from recent entries.
     try:
-        profile.maybe_refresh()
+        profile.maybe_refresh(user_id)
     except Exception:
         pass
     return result

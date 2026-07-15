@@ -27,6 +27,11 @@ OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-s
 # Voice: which OpenAI TTS voice reads replies aloud. "fable" is British-ish.
 TTS_VOICE = os.getenv("TTS_VOICE", "fable")
 
+# Firebase Admin service-account file, used to verify sign-in tokens.
+FIREBASE_CREDENTIALS = os.getenv(
+    "FIREBASE_CREDENTIALS", "secrets/firebase-admin.json"
+)
+
 # One collection per provider — their vectors have different dimensions and
 # must not share a collection.
 COLLECTION_NAME = f"documents_{EMBEDDING_PROVIDER}"

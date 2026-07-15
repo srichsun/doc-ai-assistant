@@ -1,12 +1,21 @@
-"""App-level route tests."""
+"""App-level route tests.
+
+Every data route now requires a signed-in user. We override the auth
+dependency with a fixed test uid instead of verifying a real Firebase token,
+and scope the entries we create to that same uid.
+"""
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from app import agent, entries, voice
+from app import agent, auth, entries, voice
 from app.main import app
 
 client = TestClient(app)
+
+TEST_UID = "u-test"
+# Pretend the request is signed in as TEST_UID for all tests by default.
+app.dependency_overrides[auth.current_user] = lambda: TEST_UID
 
 
 def test_health():
@@ -15,8 +24,18 @@ def test_health():
     assert resp.json() == {"status": "ok"}
 
 
+def test_agent_requires_auth():
+    # Drop the override so the real gate runs; no token -> 401.
+    app.dependency_overrides.pop(auth.current_user, None)
+    try:
+        resp = client.post("/agent", json={"question": "hi"})
+        assert resp.status_code == 401
+    finally:
+        app.dependency_overrides[auth.current_user] = lambda: TEST_UID
+
+
 def test_entries_endpoint_returns_todays_entries(sqlite_db):
-    entries.save_entry("felt good today", "love that", mood="happy")
+    entries.save_entry("felt good today", "love that", user_id=TEST_UID, mood="happy")
     today = datetime.now(timezone.utc).date().isoformat()
 
     resp = client.get(f"/entries?day={today}")
@@ -27,13 +46,22 @@ def test_entries_endpoint_returns_todays_entries(sqlite_db):
     assert body["entries"][0]["mood"] == "happy"
 
 
+def test_entries_are_scoped_to_the_signed_in_user(sqlite_db):
+    # Someone else's entry must not show up for TEST_UID.
+    entries.save_entry("their private day", "ok", user_id="someone-else", mood="sad")
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    resp = client.get(f"/entries?day={today}")
+    assert resp.json()["entries"] == []
+
+
 def test_talk_transcribes_then_replies(monkeypatch):
     # No real OpenAI/LLM calls: fake the transcription and the coach.
     monkeypatch.setattr(voice, "transcribe", lambda data, name: "I feel tired")
     monkeypatch.setattr(
         agent,
         "chat_and_log",
-        lambda text, session_id=None: {
+        lambda text, user_id=None, session_id=None: {
             "answer": "rest is okay",
             "tools_used": [],
             "sources": [],
@@ -61,8 +89,10 @@ def test_speak_returns_audio(monkeypatch):
 
 
 def test_wins_endpoint_lists_only_wins(sqlite_db):
-    entries.save_entry("just a normal day", "ok", wins=None)
-    entries.save_entry("shipped the feature", "huge!", wins="shipped feature")
+    entries.save_entry("just a normal day", "ok", user_id=TEST_UID, wins=None)
+    entries.save_entry(
+        "shipped the feature", "huge!", user_id=TEST_UID, wins="shipped feature"
+    )
 
     resp = client.get("/wins")
     assert resp.status_code == 200

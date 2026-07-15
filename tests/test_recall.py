@@ -18,8 +18,8 @@ class _FakeStore:
     def add_texts(self, texts, metadatas=None, ids=None):
         self.added.append((texts, metadatas, ids))
 
-    def similarity_search(self, query, k):
-        self.last = (query, k)
+    def similarity_search(self, query, k, filter=None):
+        self.last = (query, k, filter)
         return self._docs[:k]
 
 
@@ -32,33 +32,52 @@ def test_index_entry_adds_text_keyed_by_row_id(monkeypatch):
     store = _FakeStore()
     monkeypatch.setattr(recall, "_store", lambda: store)
 
-    recall.index_entry(42, "I felt anxious before the interview")
+    recall.index_entry(42, "I felt anxious before the interview", user_id="u9")
 
     assert store.added == [
-        (["I felt anxious before the interview"], [{"entry_id": 42}], ["42"])
+        (
+            ["I felt anxious before the interview"],
+            [{"entry_id": 42, "user_id": "u9"}],
+            ["42"],
+        )
     ]
 
 
-def test_recall_returns_page_contents(monkeypatch):
+def test_recall_filters_by_user(monkeypatch):
     store = _FakeStore(docs=[_Doc("first"), _Doc("second")])
     monkeypatch.setattr(recall, "_store", lambda: store)
 
-    hits = recall.recall("interview nerves", k=2)
+    hits = recall.recall("interview nerves", user_id="u9", k=2)
 
     assert hits == ["first", "second"]
-    assert store.last == ("interview nerves", 2)
+    # The query is scoped to the user via a metadata filter.
+    assert store.last == ("interview nerves", 2, {"user_id": "u9"})
 
 
-def test_search_past_entries_tool_formats_hits(monkeypatch):
-    monkeypatch.setattr(recall, "recall", lambda q, k=recall.TOP_K: ["a win", "a worry"])
+def test_search_past_entries_tool_uses_current_user(monkeypatch):
+    from app import auth
 
-    out = recall.search_past_entries.invoke({"query": "how am I doing"})
+    seen = {}
+    monkeypatch.setattr(
+        recall,
+        "recall",
+        lambda q, user_id=None, k=recall.TOP_K: seen.update(uid=user_id)
+        or ["a win", "a worry"],
+    )
+    token = auth.current_uid.set("u-caller")
+    try:
+        out = recall.search_past_entries.invoke({"query": "how am I doing"})
+    finally:
+        auth.current_uid.reset(token)
 
     assert out == "- a win\n\n- a worry"
+    assert seen["uid"] == "u-caller"
 
 
 def test_search_past_entries_tool_handles_no_history(monkeypatch):
-    monkeypatch.setattr(recall, "recall", lambda q, k=recall.TOP_K: [])
+    monkeypatch.setattr(
+        recall, "recall", lambda q, user_id=None, k=recall.TOP_K: []
+    )
 
     out = recall.search_past_entries.invoke({"query": "anything"})
 

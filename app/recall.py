@@ -15,7 +15,7 @@ from langchain_core.tools import tool
 from langchain_openai import OpenAIEmbeddings
 from langchain_postgres import PGVector
 
-from app import config
+from app import auth, config
 
 # Kept separate from the SQL `entries` table; PGVector manages its own tables.
 COLLECTION_NAME = "journal_entries"
@@ -44,20 +44,25 @@ def _store() -> PGVector:
     )
 
 
-def index_entry(entry_id: int, text: str) -> None:
+def index_entry(entry_id: int, text: str, user_id: str | None = None) -> None:
     """Embed one journal entry's text into pgvector, keyed by its row id.
 
     Using the SQL row id as the vector id keeps the two stores in sync and
     makes re-indexing the same entry idempotent (it overwrites, not appends).
+    The user id rides along as metadata so recall can filter to one person.
     """
     _store().add_texts(
-        [text], metadatas=[{"entry_id": entry_id}], ids=[str(entry_id)]
+        [text],
+        metadatas=[{"entry_id": entry_id, "user_id": user_id}],
+        ids=[str(entry_id)],
     )
 
 
-def recall(query: str, k: int = TOP_K) -> list[str]:
-    """Return up to k past entry snippets most relevant to the query."""
-    docs = _store().similarity_search(query, k=k)
+def recall(query: str, user_id: str | None = None, k: int = TOP_K) -> list[str]:
+    """Return up to k of one person's past entry snippets most relevant to the query."""
+    docs = _store().similarity_search(
+        query, k=k, filter={"user_id": user_id}
+    )
     return [d.page_content for d in docs]
 
 
@@ -67,7 +72,8 @@ def search_past_entries(query: str) -> str:
     they are talking about now. Use this to ground your reply in their real
     history — what they said before, recurring patterns, or similar feelings —
     instead of guessing. The query should describe the current topic or feeling."""
-    hits = recall(query)
+    # Scope to whoever is signed in for this request.
+    hits = recall(query, user_id=auth.current_uid.get())
     if not hits:
         return "No related past entries found."
     return "\n\n".join(f"- {h}" for h in hits)

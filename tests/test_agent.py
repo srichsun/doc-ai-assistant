@@ -54,21 +54,23 @@ def test_chat_and_log_saves_a_journal_entry(sqlite_db, monkeypatch):
     # Capture the semantic index call instead of hitting the real vector store.
     indexed = []
     monkeypatch.setattr(
-        agent.recall, "index_entry", lambda eid, text: indexed.append((eid, text))
+        agent.recall,
+        "index_entry",
+        lambda eid, text, user_id=None: indexed.append((eid, text, user_id)),
     )
 
-    result = agent.chat_and_log("I ran 5k today", session_id="s-log")
+    result = agent.chat_and_log("I ran 5k today", user_id="u1", session_id="s-log")
     assert result["answer"] == "proud of you"
 
-    # The exchange should now be in the database.
-    saved = entries.entries_on(datetime.now(timezone.utc).date())
+    # The exchange should now be in the database, owned by u1.
+    saved = entries.entries_on(datetime.now(timezone.utc).date(), user_id="u1")
     assert len(saved) == 1
     assert saved[0].transcript == "I ran 5k today"
     assert saved[0].mood == "proud"
     assert saved[0].wins == "ran 5k"
 
-    # ...and indexed for semantic recall, keyed by the saved row id.
-    assert indexed == [(saved[0].id, "I ran 5k today")]
+    # ...and indexed for semantic recall, keyed by the saved row id and user.
+    assert indexed == [(saved[0].id, "I ran 5k today", "u1")]
 
 
 # --- tool helpers (from the original engine, reused by later phases) ---

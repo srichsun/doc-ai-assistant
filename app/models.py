@@ -25,6 +25,9 @@ class Entry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, index=True
     )
+    # Firebase uid of the person this entry belongs to. Nullable so pre-auth
+    # rows still load; new rows always carry it.
+    user_id: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     transcript: Mapped[str] = mapped_column(Text)  # what the user said
     ai_reply: Mapped[str] = mapped_column(Text)  # what the coach replied

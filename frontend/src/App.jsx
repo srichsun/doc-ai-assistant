@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import "./App.css";
+import {
+  getIdToken,
+  onAuthChange,
+  signInWithGoogle,
+  signOutUser,
+} from "./firebase";
 
 // Where the FastAPI backend runs.
 const API = "http://127.0.0.1:8000";
@@ -14,12 +20,35 @@ function getSessionId() {
   return id;
 }
 
+// fetch() with the signed-in user's ID token attached, so the backend knows
+// who's asking and can scope the journal to them.
+async function authFetch(url, options = {}) {
+  const token = await getIdToken();
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+}
+
 export default function App() {
   // --- state: the things that change over time ---
+  const [user, setUser] = useState(null);        // the signed-in Firebase user
+  const [authReady, setAuthReady] = useState(false); // first auth check done?
   const [messages, setMessages] = useState([]); // [{ role, text }]
   const [input, setInput] = useState("");        // what's typed in the box
   const [loading, setLoading] = useState(false); // waiting for a reply?
   const [recording, setRecording] = useState(false);
+
+  // Track sign-in state; runs once on mount.
+  useEffect(() => {
+    return onAuthChange((u) => {
+      setUser(u);
+      setAuthReady(true);
+    });
+  }, []);
 
   // Kept between renders: the recorder and the audio chunks it produces.
   const recorderRef = useRef(null);
@@ -55,7 +84,7 @@ export default function App() {
     setInput("");
     setLoading(true);
     try {
-      const res = await fetch(`${API}/agent`, {
+      const res = await authFetch(`${API}/agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text, session_id: getSessionId() }),
@@ -100,7 +129,7 @@ export default function App() {
       const form = new FormData();
       form.append("audio", blob, "clip.webm");
       form.append("session_id", getSessionId());
-      const res = await fetch(`${API}/talk`, { method: "POST", body: form });
+      const res = await authFetch(`${API}/talk`, { method: "POST", body: form });
       const data = await res.json();
       setMessages((prev) => [
         ...prev,
@@ -118,11 +147,35 @@ export default function App() {
     }
   }
 
+  // Before the first auth check, show nothing to avoid a sign-in flash.
+  if (!authReady) return null;
+
+  // Signed out: a simple gate. The coach is per-person, so sign in first.
+  if (!user) {
+    return (
+      <div className="app gate">
+        <header className="head">
+          <h1>Daily Coach</h1>
+          <p>Your personal coach that remembers, and gets to know you.</p>
+        </header>
+        <button className="google" onClick={() => signInWithGoogle()}>
+          Sign in with Google
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header className="head">
         <h1>Daily Coach</h1>
         <p>Talk about your day — I'll remember, and help you see your wins.</p>
+        <div className="who">
+          <span>{user.displayName || user.email}</span>
+          <button className="signout" onClick={() => signOutUser()}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       <main className="chat">

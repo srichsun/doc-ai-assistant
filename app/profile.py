@@ -16,9 +16,6 @@ from sqlalchemy import select
 from app import config, db, entries
 from app.models import Profile
 
-# Single local user for now; Phase 6 (auth) swaps this for a real user id.
-DEFAULT_KEY = "default"
-
 # Re-condense the profile once this many new entries have accumulated. Cheap,
 # deterministic, and good enough — we don't need a real-time rewrite every turn.
 REFRESH_EVERY = 5
@@ -45,10 +42,13 @@ def _condense_model() -> ChatAnthropic:
     )
 
 
-def get_profile(key: str = DEFAULT_KEY) -> str:
-    """The person's current profile text, or "" if none has formed yet."""
+def get_profile(user_id: str | None) -> str:
+    """One person's current profile text, or "" if none has formed yet.
+
+    The profile row is keyed by the person's Firebase uid.
+    """
     with db.get_session() as s:
-        row = s.get(Profile, key)
+        row = s.get(Profile, user_id)
         return row.content if row else ""
 
 
@@ -60,34 +60,34 @@ def condense(existing: str, recent_text: str) -> str:
     return _condense_model().invoke(prompt).content.strip()
 
 
-def refresh_profile(key: str = DEFAULT_KEY) -> str:
-    """Re-condense the profile from the latest journal entries and save it.
+def refresh_profile(user_id: str | None) -> str:
+    """Re-condense one person's profile from their latest entries and save it.
 
     Returns the updated profile text.
     """
-    rows = entries.recent_entries()
+    rows = entries.recent_entries(user_id)
     recent_text = "\n".join(f"- {e.transcript}" for e in rows)
-    existing = get_profile(key)
+    existing = get_profile(user_id)
     updated = condense(existing, recent_text)
     with db.get_session() as s:
-        row = s.get(Profile, key)
+        row = s.get(Profile, user_id)
         if row is None:
-            row = Profile(key=key)
+            row = Profile(key=user_id)
             s.add(row)
         row.content = updated
-        row.entry_count = entries.count_entries()
+        row.entry_count = entries.count_entries(user_id)
         s.commit()
     return updated
 
 
-def maybe_refresh(key: str = DEFAULT_KEY) -> None:
-    """Refresh the profile only when enough new entries have piled up.
+def maybe_refresh(user_id: str | None) -> None:
+    """Refresh one person's profile only when enough new entries have piled up.
 
     Called after saving each entry. Cheap no-op most turns; runs the condense
     LLM call about once every REFRESH_EVERY entries.
     """
     with db.get_session() as s:
-        row = s.get(Profile, key)
+        row = s.get(Profile, user_id)
         last_count = row.entry_count if row else 0
-    if entries.count_entries() - last_count >= REFRESH_EVERY:
-        refresh_profile(key)
+    if entries.count_entries(user_id) - last_count >= REFRESH_EVERY:
+        refresh_profile(user_id)
