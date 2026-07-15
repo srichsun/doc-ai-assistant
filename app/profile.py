@@ -11,7 +11,6 @@ re-reading the whole history.
 Fixed size on purpose: injected every turn, so it must not grow without bound.
 """
 from langchain_anthropic import ChatAnthropic
-from sqlalchemy import select
 
 from app import config, db, entries
 from app.models import Profile
