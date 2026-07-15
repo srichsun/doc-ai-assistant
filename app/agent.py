@@ -13,8 +13,9 @@ import uuid
 from langchain.agents import create_agent
 from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.memory import InMemorySaver
+from pydantic import BaseModel, Field
 
-from app import config
+from app import config, entries
 
 SYSTEM_PROMPT = (
     "You are a warm, encouraging personal life coach and journaling companion. "
@@ -74,3 +75,56 @@ def run(message: str, session_id: str | None = None) -> dict:
         "sources": [],
         "session_id": session_id,
     }
+
+
+class EntryTags(BaseModel):
+    """The few things we pull out of an exchange to store alongside the text,
+    so later we can list wins or chart mood without re-reading everything."""
+
+    mood: str | None = Field(
+        None, description="one word for the person's mood, e.g. anxious, proud, calm"
+    )
+    wins: str | None = Field(
+        None, description="a short win the person mentioned, else null"
+    )
+    themes: str | None = Field(
+        None, description="comma-separated topics, e.g. work, health, family"
+    )
+
+
+# A small model call that only returns the structured tags above.
+_extractor = _default_model().with_structured_output(EntryTags)
+
+
+def extract_tags(transcript: str, reply: str) -> EntryTags:
+    """Pull mood / wins / themes out of one exchange."""
+    prompt = (
+        "From this journaling exchange, extract the person's mood, any win they "
+        "mentioned, and the main themes. Use null when something isn't there.\n"
+        f"Person: {transcript}\nCoach: {reply}"
+    )
+    return _extractor.invoke(prompt)
+
+
+def chat_and_log(message: str, session_id: str | None = None) -> dict:
+    """Reply as the coach, then save the exchange as a journal entry.
+
+    Every turn is saved on purpose — that's the whole point (unlike ChatGPT,
+    nothing is forgotten). If tag extraction fails, we still save the raw
+    exchange with empty tags rather than lose it.
+    """
+    result = run(message, session_id)
+    reply = result["answer"]
+    try:
+        tags = extract_tags(message, reply)
+    except Exception:
+        tags = EntryTags()
+    entries.save_entry(
+        transcript=message,
+        ai_reply=reply,
+        session_id=session_id,
+        mood=tags.mood,
+        wins=tags.wins,
+        themes=tags.themes,
+    )
+    return result

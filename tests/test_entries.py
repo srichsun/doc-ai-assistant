@@ -1,30 +1,10 @@
 """Journal entry storage tests, run against an in-memory SQLite database
-so they need no Postgres server and spend no time on I/O."""
+so they need no Postgres server and spend no time on I/O.
+
+The sqlite_db fixture lives in conftest.py."""
 from datetime import datetime, timezone
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app import db, entries
-from app.models import Base
-
-
-@pytest.fixture
-def sqlite_db(monkeypatch):
-    # One shared in-memory connection so the created tables stick around.
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    monkeypatch.setattr(db, "engine", engine)
-    monkeypatch.setattr(
-        db, "SessionLocal", sessionmaker(bind=engine, expire_on_commit=False)
-    )
-    return engine
+from app import entries
 
 
 def test_save_and_read_back(sqlite_db):

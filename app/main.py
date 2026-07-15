@@ -1,11 +1,13 @@
-"""FastAPI entrypoint for the document Q&A assistant."""
+"""FastAPI entrypoint for the life-coach journaling app."""
+from datetime import date, datetime, timezone
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app import agent, rag
+from app import agent, entries
 
-app = FastAPI(title="Doc AI Assistant")
+app = FastAPI(title="Daily Coach")
 
 # Allow the local React dev server (Vite) to call this API from the browser.
 app.add_middleware(
@@ -16,16 +18,29 @@ app.add_middleware(
 )
 
 
-class AgentRequest(BaseModel):
+class TalkRequest(BaseModel):
     question: str
     session_id: str | None = None  # pass the same id to continue a conversation
 
 
-class AgentResponse(BaseModel):
+class TalkResponse(BaseModel):
     answer: str
     tools_used: list[str]
     sources: list[str] = []
     session_id: str | None = None
+
+
+def _entry_dict(e) -> dict:
+    """Turn a stored Entry into plain JSON for the review screens."""
+    return {
+        "id": e.id,
+        "created_at": e.created_at.isoformat(),
+        "mood": e.mood,
+        "wins": e.wins,
+        "themes": e.themes,
+        "transcript": e.transcript,
+        "ai_reply": e.ai_reply,
+    }
 
 
 @app.get("/health")
@@ -34,16 +49,24 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/search")
-def search(q: str):
-    """Return the most relevant chunks for a query (retrieval sanity check)."""
-    return {"query": q, "hits": rag.retrieve(q)}
+@app.post("/agent", response_model=TalkResponse)
+def agent_endpoint(req: TalkRequest):
+    """Talk to the coach. The exchange is saved as a journal entry.
 
-
-@app.post("/agent", response_model=AgentResponse)
-def agent_endpoint(req: AgentRequest):
-    """Agent version: Claude decides which tools to call (search / order lookup).
-
-    Pass a session_id to keep context across follow-up questions.
+    Pass a session_id to keep memory across follow-ups.
     """
-    return agent.run(req.question, session_id=req.session_id)
+    return agent.chat_and_log(req.question, session_id=req.session_id)
+
+
+@app.get("/entries")
+def entries_on_day(day: str | None = None):
+    """Recall one day's entries. `day` is YYYY-MM-DD; defaults to today (UTC)."""
+    d = date.fromisoformat(day) if day else datetime.now(timezone.utc).date()
+    rows = entries.entries_on(d)
+    return {"day": d.isoformat(), "entries": [_entry_dict(r) for r in rows]}
+
+
+@app.get("/wins")
+def wins():
+    """List the most recent entries where the coach recorded a win."""
+    return {"wins": [_entry_dict(r) for r in entries.recent_wins()]}
