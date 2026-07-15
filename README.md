@@ -1,69 +1,117 @@
-# Doc AI Assistant
+# Daily Coach
 
 **English** · [中文](README.zh-TW.md)
 
-A **RAG (Retrieval-Augmented Generation) document Q&A API**. You load a
-set of documents (product docs, policies, FAQs), and users ask questions in
-natural language. The service retrieves the relevant passages and asks Claude to
-answer **using only those passages**, returning the answer together with its
-sources. If the answer isn't in the documents, it says so instead of guessing.
+> 🌐 **Live showcase / 線上展示頁 → https://srichsun.github.io/doc-ai-assistant/**
 
-The demo knowledge base is a product **customer-support assistant** (plans,
-returns policy, warranty). Swap the files in `data/` and it becomes an internal
-knowledge base, a technical-docs bot, etc.
+A **voice AI life coach** you talk to every day. You speak; it listens, reflects
+back what it hears, helps you notice your small wins and the patterns in how you
+live — and, unlike a stateless chatbot, it **remembers**. You can look back on
+any day, watch your wins add up, and over time it genuinely gets to know you.
 
-## Why RAG (and not just ChatGPT)
+The core idea is **three layers of memory** so the coach can carry a huge,
+ever-growing history while every prompt stays a fixed, bounded size — the cost
+and context never blow up no matter how long you use it.
 
-A general chatbot doesn't know your private documents, and pasting whole
-documents into every prompt is expensive and hits context limits. RAG retrieves
-only the relevant chunks, so answers are **cheaper, grounded, and cite their
-source** — which is exactly what companies build in-house.
+## Why three layers of memory
 
-## Architecture
+A general chatbot forgets you the moment the tab closes. Feeding it your whole
+history every turn is expensive and eventually overflows the context window.
+Daily Coach splits memory into three layers, each answering a different question:
+
+| Layer | Backed by | Answers | AI? |
+|-------|-----------|---------|-----|
+| **1. Structured log** | Postgres (plain SQL) | "What happened, and when?" — recall a day, this month's wins, mood trends | No AI, just SQL |
+| **2. Semantic recall** | pgvector + OpenAI embeddings | "What past moment is relevant to *right now*?" — the coach pulls back similar entries mid-conversation | Embeddings + vector search |
+| **3. Rolling profile** | LLM-condensed summary | "Who is this person?" — goals, habits, triggers, what helps — injected into every reply | An LLM re-condenses it |
+
+Every prompt is assembled as **profile + relevant recalled past + today's
+context**. The journal in Postgres can grow forever; the prompt does not, because
+layers 2 and 3 keep only a fixed slice of it. That rolling profile — the coach
+steadily learning who you are — is exactly what a stateless chatbot cannot do.
+
+## How a day with the coach flows
 
 ```
-                ingest (offline)                     query (per request)
-  data/*.pdf,*.md ──> chunk ──> embed ──> Chroma      question
-                                            │            │
-                                            └── retrieve top-k chunks
-                                                         │
-                                        build prompt (context + question)
-                                                         │
-                                              Claude (Anthropic API)
-                                                         │
-                                             answer + source citations
+  you speak ──► Whisper (STT) ──► LangChain life-coach agent
+                                        │
+             ┌──────────────────────────┼───────────────────────────┐
+             │ profile injected          │ search_past_entries tool  │
+             │ (layer 3, every turn)     │ → pgvector (layer 2)      │
+             └──────────────────────────┼───────────────────────────┘
+                                        ▼
+                                   Claude replies
+                                        │
+                       ┌────────────────┴────────────────┐
+                       ▼                                  ▼
+              ElevenLabs (TTS)                  save entry to Postgres (layer 1)
+              reads it aloud                    + embed it into pgvector (layer 2)
+                                                + periodically re-condense profile (layer 3)
 ```
 
-- **Embeddings** run locally via Chroma's built-in model — no API key needed to
-  ingest or retrieve.
-- Only the **answer generation** step (`/agent`) calls the Anthropic API.
+So one exchange both **answers you now** and **feeds all three memory layers**
+for next time.
 
-## Tech choices
+## What's under the hood
 
-| Piece         | Choice     | Why not the alternative |
-|---------------|------------|-------------------------|
-| Web framework | FastAPI    | Async + type hints + auto Swagger docs; lighter than Django for an API. |
-| Packaging     | uv         | One tool for venv + lockfile, much faster than pip/poetry. |
-| Vector store  | Chroma     | Embedded, zero infra; no SaaS account (Pinecone) or extra DB (pgvector). |
-| LLM           | Claude     | Clean Anthropic SDK; model configurable, defaults to `claude-haiku-4-5` (cheap for dev). |
-| Embeddings    | Chroma local (all-MiniLM) | No API key or cost by default; swap to a cloud model when needed. |
+- **Voice in** — OpenAI **Whisper** turns your recorded audio into text.
+- **The coach** — a LangChain agent (`create_agent`) driven by **Claude**
+  (`ChatAnthropic`), with a single `search_past_entries` tool it calls on its own
+  whenever recalling a past moment would help. The profile is injected each turn
+  via a dynamic prompt.
+- **Voice out** — the reply is read aloud with **ElevenLabs** (a warm British
+  voice); OpenAI TTS is a drop-in fallback behind the same `speak()` call.
+- **Accounts** — **Firebase Auth (Google sign-in)** in the browser. The backend
+  verifies the ID token with the Firebase Admin SDK and scopes every entry,
+  every recall, and the profile to that one person. Protected endpoints require
+  sign-in.
+- **Observability** — **LangSmith** traces every chain and agent call.
+
+## Privacy
+
+The public repo, the showcase page, and the deployed demo use **seed / fake data
+only**. Real journal entries stay on your machine and are gitignored, no API keys
+live in the repo, and the deployed `/talk` endpoint is gated behind sign-in — so
+nobody spends your keys or reads your journal.
+
+## Tech stack
+
+| Piece | Choice | Why |
+|-------|--------|-----|
+| Web framework | **FastAPI** | Async, type hints, auto Swagger docs; light for an API. |
+| Packaging | **uv** | One tool for venv + lockfile, far faster than pip/poetry. |
+| Orchestration | **LangChain** | Agent + RAG + memory in one industry-standard stack, instead of hand-rolling the tool loop. |
+| LLM | **Claude** via `ChatAnthropic` | The coach's replies and the profile-condensing calls. |
+| Speech-to-text | **OpenAI Whisper** | Robust transcription of recorded audio. |
+| Text-to-speech | **ElevenLabs** | Warm, real-sounding voice; OpenAI TTS as fallback. |
+| Journal store | **Postgres + pgvector** | One database holds both the SQL entries and the vectors (LangChain `PGVector`). |
+| Embeddings | **OpenAI** `text-embedding-3-small` | Powers semantic recall. |
+| Auth | **Firebase Auth** (Google) | No passwords handled here; per-user scoping from a verified uid. |
+| Tracing | **LangSmith** | Every chain/agent call is traced. |
+| Frontend | **React (Vite)** | Minimal chat screen with mic recording + spoken replies. |
+| CI | **GitHub Actions** | ruff + pytest on every push. |
+| Deploy | **Google Cloud** | Cloud Run + Cloud SQL (Postgres + pgvector) + Secret Manager. |
 
 ## Project layout
 
 ```
 app/
-  config.py   settings from env / .env
-  main.py     FastAPI routes: /health, /search, /agent
-  llm.py      shared Anthropic client
-  store.py    Chroma client + pluggable embedding provider
-  rag.py      read/chunk/ingest + retrieve
-  tools.py    agent tools: search_documents, lookup_order
-  agent.py    tool-use loop (Claude picks the tools)
-  sessions.py in-memory conversation history
+  main.py      FastAPI routes: /health /agent /talk /speak /entries /wins /profile
+  agent.py     LangChain life-coach agent (create_agent + Claude + search tool + profile injection)
+  recall.py    semantic recall — search_past_entries tool over pgvector (layer 2)
+  profile.py   rolling LLM-condensed profile (layer 3)
+  entries.py   plain-SQL journal: save, recall a day, list wins (layer 1)
+  voice.py     Whisper (STT) + ElevenLabs / OpenAI (TTS)
+  auth.py      Firebase ID-token verification, per-user scoping
+  db.py        SQLAlchemy engine + session
+  models.py    Entry and Profile tables
+  config.py    settings from env / .env
 scripts/
-  ingest.py   CLI to load data/ into the vector store
-data/          your source documents (gitignored)
-tests/         pytest (LLM + retrieval mocked, no API key needed)
+  init_db.py     create the database tables
+  deploy_gcp.sh  deploy to Cloud Run + Cloud SQL + Secret Manager
+frontend/        React (Vite) chat UI with mic + Google sign-in gate
+Dockerfile       container image for Cloud Run
+.github/workflows/ci.yml   ruff + pytest
 ```
 
 ## Setup
@@ -72,11 +120,13 @@ tests/         pytest (LLM + retrieval mocked, no API key needed)
 # 1. install deps (uv creates the venv from the lockfile)
 uv sync
 
-# 2. add your Anthropic key (only needed for /agent)
-cp .env.example .env         # then edit .env and paste your key
+# 2. start local Postgres (pgvector image) and create the tables
+docker compose up -d
+uv run python -m scripts.init_db
 
-# 3. load documents into the vector store (downloads the embedding model once)
-uv run python -m scripts.ingest
+# 3. add your keys
+cp .env.example .env    # then edit .env: ANTHROPIC / OPENAI / ELEVENLABS keys,
+                        # FIREBASE_CREDENTIALS, optional LANGSMITH_API_KEY
 
 # 4. run the API
 uv run uvicorn app.main:app --reload
@@ -86,47 +136,23 @@ Open http://127.0.0.1:8000/docs for the interactive Swagger UI.
 
 ## Endpoints
 
-| Method | Path         | Description |
-|--------|--------------|-------------|
-| GET    | `/health`    | Liveness check. |
-| GET    | `/search?q=` | Return the top-k retrieved chunks (retrieval sanity check; no LLM, no key). |
-| POST   | `/agent`     | Agent: Claude picks tools. `{"question", "session_id?"}` → `{"answer", "tools_used", "sources", "session_id"}`. |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET  | `/health`          | — | Liveness check; no key needed. |
+| POST | `/agent`           | ✅ | Typed chat. `{"question", "session_id?"}` → reply; the exchange is saved as a journal entry. |
+| POST | `/talk`            | ✅ | Upload recorded audio → Whisper transcribes → coach replies; also returns the transcript. |
+| POST | `/speak`           | — | Text → spoken audio (mp3) for the browser to play. |
+| GET  | `/entries?day=`    | ✅ | Recall one day's entries (`YYYY-MM-DD`, defaults to today). |
+| GET  | `/wins`            | ✅ | The most recent entries where a win was recorded. |
+| GET  | `/profile`         | ✅ | The long-term profile the coach has built about you. |
+| POST | `/profile/refresh` | ✅ | Force a re-condense of the profile (normally automatic every few entries). |
 
-`/agent` requires `ANTHROPIC_API_KEY`.
-
-```bash
-curl -X POST http://127.0.0.1:8000/agent \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What is the status of order 1001, and can I still return it?"}'
-```
-
-## How the agent decides
-
-Retrieval is exposed as a `search_documents` **tool** (plus a `lookup_order`
-tool), and Claude decides *which* tools to call and *how many times* — not a
-fixed "always retrieve, then answer" pipeline. A question like "what's the
-status of order 1001 and can I return it?" makes the agent call **both**
-tools on its own. It also keeps conversation memory via `session_id`, so
-follow-ups ("when will it arrive?") keep context.
-
-## Design decisions & trade-offs
-
-- **Local embeddings by default** — free and offline for development; the
-  `openai` provider is one env var away when higher retrieval quality is worth
-  the cost. One collection per provider (their vector dimensions differ).
-- **Paragraph-aware chunking** — packing whole paragraphs instead of cutting
-  every N characters keeps chunks as clean semantic units and measurably lowered
-  retrieval distance on sample queries.
-- **Grounded answers** — the system prompt tells the model to answer only from
-  tool results and say "I don't know" otherwise, which avoids hallucinated
-  policy answers. `/agent` returns the sources it searched so answers are
-  auditable.
-- **In-memory sessions** — fine for a demo; a real deployment would use Redis or
-  a database so history survives restarts and scales across workers.
+Protected endpoints expect `Authorization: Bearer <Firebase ID token>`.
 
 ## Web UI
 
-A minimal React (Vite) chat frontend lives in `frontend/`. With the API
+A minimal React (Vite) frontend lives in `frontend/`: a chat screen with mic
+recording and spoken replies, behind a Google sign-in gate. With the API
 running, start it in a second terminal:
 
 ```bash
@@ -143,14 +169,13 @@ It talks to the API at `http://127.0.0.1:8000` (allowed via CORS).
 uv run pytest
 ```
 
-The LLM call and retrieval are mocked, so the suite runs without an API key.
+The LLM, voice, and vector store are mocked and the suite runs against in-memory
+SQLite, so it needs no API key and no running Postgres. CI (GitHub Actions) runs
+`ruff check` + `pytest` on every push.
 
-## Roadmap
+## Deploy
 
-Done: pluggable embeddings, paragraph-aware chunking, the agent (tool use),
-multi-turn memory, and a React chat frontend with tool/source citations.
-Still to do:
-
-- PDF upload UI (plus a backend `/ingest` endpoint).
-- Deploy a live demo (deferred — a public `/agent` spends the owner's API
-  key, so it needs a gate first).
+`scripts/deploy_gcp.sh` provisions the whole thing on **Google Cloud**: a Cloud
+Run service for the API, **Cloud SQL** (Postgres with pgvector) for the journal
+and vectors, and **Secret Manager** for every key and the Firebase service
+account. Run it after `gcloud auth login`.

@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Doc AI Assistant</title>
-<meta name="description" content="A RAG document Q&A API that grows into a tool-using agent. Grounded answers with citations, built on FastAPI and Claude.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+<title>Daily Coach</title>
+<meta name="description" content="A voice AI life coach with three layers of memory — it listens, remembers, and gets to know you over time. Built on FastAPI, LangChain, and Claude.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
 <style>
   :root{
     --bg:#0b0e14; --panel:#11151f; --line:#1e2532; --text:#e6e9ef;
@@ -85,7 +85,7 @@
   .node.ghost b{font-size:13px;font-weight:600}
   .v{color:var(--muted);font-size:13px;font-family:var(--mono)}
   .arr{color:var(--muted)}
-  .row3{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row3{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
   .row2{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
   .branch{display:flex;flex-direction:column;align-items:center;gap:6px}
   /* nested "shell wraps internals" box: a tool's outer interface containing
@@ -99,7 +99,7 @@
     font-size:10.5px;color:var(--muted);margin:1px 0 3px}
   .toolbox .inner{width:90%;padding:9px 12px;background:var(--bg)}
   .loopbox{border:1px dashed var(--line);border-radius:16px;padding:16px 16px 12px;margin:4px 0;width:100%;
-    max-width:540px;display:flex;flex-direction:column;align-items:center;gap:6px}
+    max-width:560px;display:flex;flex-direction:column;align-items:center;gap:6px}
   .looplabel{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;color:var(--accent2)}
   .loopback{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:8px}
   .detail{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:20px;
@@ -112,11 +112,11 @@
 </head>
 <body>
 <nav><div class="wrap nav">
-  <div class="brand">Doc<span>·</span>AI</div>
+  <div class="brand">Daily<span>·</span>Coach</div>
   <div class="links">
     <a href="#overview" data-en="Overview" data-zh="總覽"></a>
+    <a href="#memory" data-en="Memory" data-zh="記憶"></a>
     <a href="#architecture" data-en="Architecture" data-zh="架構"></a>
-    <a href="#agent" data-en="Agent" data-zh="Agent"></a>
     <a href="#stack" data-en="Stack" data-zh="技術"></a>
   </div>
   <span class="langtoggle" id="langBtn">中文</span>
@@ -124,87 +124,122 @@
 </div></nav>
 
 <header><div class="wrap">
-  <div class="kicker" data-en="RAG · Agent · Tool use" data-zh="RAG · Agent · 工具呼叫"></div>
-  <h1 data-en="Ask your documents.<br><em>Get grounded answers.</em>" data-zh="問你的文件，<br><em>得到有根據的答案。</em>"></h1>
-  <p class="lede" data-en="A document Q&amp;A API that retrieves the relevant passages and answers using only those passages — with citations. Then it grows into an agent that decides which tools to call on its own." data-zh="一個文件問答 API：檢索相關段落、只根據這些段落回答，並附上來源。接著它升級成一個能自己決定呼叫哪些工具的 agent。"></p>
+  <div class="kicker" data-en="Voice · Memory · Agent" data-zh="語音 · 記憶 · Agent"></div>
+  <h1 data-en="Talk to a coach that<br><em>remembers you.</em>" data-zh="跟一個<br><em>記得你的教練</em>聊聊。"></h1>
+  <p class="lede" data-en="A voice AI life coach you talk to every day. It listens, reflects back what it hears, and helps you notice your small wins — and, unlike a stateless chatbot, it remembers. Three layers of memory let it carry a lifetime of journal entries while every prompt stays a fixed size." data-zh="一個你每天用講的來聊的語音 AI 人生教練。它聽、把聽到的重點反映回來、幫你注意到小小的成就 —— 而且跟無狀態聊天機器人不一樣，它會記得。三層記憶讓它扛著一輩子的日誌，卻讓每次 prompt 維持固定大小。"></p>
   <div class="cta">
     <a class="btn primary" href="https://github.com/srichsun/doc-ai-assistant" target="_blank" rel="noopener" data-en="View source" data-zh="看原始碼"></a>
-    <a class="btn" href="#agent" data-en="How the agent works" data-zh="Agent 怎麼運作"></a>
+    <a class="btn" href="#memory" data-en="How the memory works" data-zh="記憶怎麼運作"></a>
   </div>
   <div class="metrics">
-    <div class="metric"><b>2</b><span data-en="tools, agent-selected" data-zh="工具，agent 自選"></span></div>
-    <div class="metric"><b>12</b><span data-en="tests, all green" data-zh="測試，全過"></span></div>
-    <div class="metric"><b>0</b><span data-en="ungrounded answers" data-zh="無根據的答案"></span></div>
+    <div class="metric"><b>3</b><span data-en="layers of memory" data-zh="層記憶"></span></div>
+    <div class="metric"><b>8</b><span data-en="API endpoints" data-zh="API endpoint"></span></div>
+    <div class="metric"><b>0</b><span data-en="keys in the repo" data-zh="key 進 repo"></span></div>
   </div>
 </div></header>
 
 <section id="overview"><div class="wrap">
   <div class="sec-h" data-en="What it does" data-zh="它在做什麼"></div>
-  <h2 data-en="Grounded document Q&amp;A" data-zh="有根據的文件問答"></h2>
-  <p class="lede" style="font-size:16px" data-en="Load your documents (product docs, policies, FAQs). Users ask in plain language. The service retrieves the most relevant chunks, asks the model to answer using only those chunks, and returns the answer with its sources. If the answer isn't in the documents, it says so instead of guessing." data-zh="載入你的文件（產品說明、政策、FAQ）。使用者用自然語言提問。服務檢索最相關的片段，請模型只根據這些片段回答，並回傳答案與來源。文件裡沒有答案時，它會直接說不知道，而不是亂猜。"></p>
+  <h2 data-en="A coach you talk to, that gets to know you" data-zh="一個你用講的、而且會越來越懂你的教練"></h2>
+  <p class="lede" style="font-size:16px" data-en="Speak about your day. It transcribes what you said, reflects it back, and answers out loud — then saves the exchange so tomorrow it remembers. Over time it learns your goals, habits, and what helps you." data-zh="用講的聊聊你的一天。它把你說的轉成文字、反映回來、再用聲音回答 —— 然後把這次對話存下來，明天就記得。久了它會學到你的目標、習慣，還有什麼對你有用。"></p>
   <div class="grid">
     <div class="card"><div class="n">01</div>
-      <h3 data-en="Retrieval-augmented answers" data-zh="檢索增強的回答"></h3>
-      <p data-en="Only the relevant passages go into the prompt — cheaper than pasting whole documents, and answers cite where they came from." data-zh="只有相關段落進 prompt —— 比塞整份文件省，而且答案會標出來源。"></p></div>
+      <h3 data-en="Talk, don't type" data-zh="用講的，不用打字"></h3>
+      <p data-en="Tap the mic and speak. Whisper transcribes you, the coach replies, and ElevenLabs reads the answer back in a warm voice." data-zh="點麥克風開口說。Whisper 幫你轉錄，教練回覆，ElevenLabs 再用溫暖的嗓音把答案唸回來。"></p></div>
     <div class="card"><div class="n">02</div>
-      <h3 data-en="Says &quot;I don't know&quot;" data-zh="會說「不知道」"></h3>
-      <p data-en="The model is instructed to answer only from retrieved context, so it doesn't invent policies that aren't in the docs." data-zh="模型被要求只根據檢索到的內容回答，不會亂編文件裡沒有的政策。"></p></div>
+      <h3 data-en="It remembers" data-zh="它會記得"></h3>
+      <p data-en="Every exchange is saved as a journal entry. Nothing is forgotten when you close the tab — the whole point a stateless chatbot can't manage." data-zh="每次對話都存成一筆日誌。關掉分頁不會被忘記 —— 這正是無狀態聊天機器人做不到的關鍵。"></p></div>
     <div class="card"><div class="n">03</div>
-      <h3 data-en="Retrieval you can tune" data-zh="可調的檢索"></h3>
-      <p data-en="Local embeddings by default (no key, offline), paragraph-aware chunking for cleaner matches, and a one-flag switch to a cloud embedding model." data-zh="預設本地 embedding（免 key、離線）、段落感知切塊讓比對更乾淨，一個設定就能切到雲端 embedding 模型。"></p></div>
+      <h3 data-en="Gets to know you" data-zh="越來越懂你"></h3>
+      <p data-en="A rolling, LLM-condensed profile — your goals, habits, triggers, what helps — is injected into every reply, so the coach always talks with a fresh sense of who you are." data-zh="一份滾動、由 LLM 濃縮的 profile（目標、習慣、地雷、什麼有用）注入每次回覆，讓教練總是帶著對你最新的理解說話。"></p></div>
     <div class="card"><div class="n">04</div>
-      <h3 data-en="Conversation memory" data-zh="對話記憶"></h3>
-      <p data-en="Pass a session id and follow-ups keep their context — &quot;when will it arrive?&quot; still knows which order you meant." data-zh="帶上 session id，追問就能延續上下文 —— 「它幾號到？」還記得你指的是哪張訂單。"></p></div>
+      <h3 data-en="Look back anytime" data-zh="隨時回頭看"></h3>
+      <p data-en="Recall any day, watch your wins add up, and see mood trends — plain SQL over your journal, no AI needed for the review screens." data-zh="回顧任何一天、看成就一點一點累積、看心情趨勢 —— 對日誌下純 SQL，回顧畫面完全不需要 AI。"></p></div>
   </div>
+</div></section>
+
+<section id="memory"><div class="wrap">
+  <div class="sec-h" data-en="The core idea" data-zh="核心概念"></div>
+  <h2 data-en="Three layers of memory" data-zh="三層記憶"></h2>
+  <p class="lede" style="font-size:16px" data-en="A general chatbot forgets you when the tab closes; feeding it your whole history every turn is expensive and eventually overflows the context window. Daily Coach splits memory into three layers, each answering a different question — so the journal can grow forever while the prompt stays bounded." data-zh="一般聊天機器人在你關掉分頁時就把你忘了；每一輪都塞整段歷史又貴、最後還會撐爆 context。Daily Coach 把記憶拆成三層，每層回答不同的問題 —— 所以日誌能無限長，prompt 卻維持有上限。"></p>
+  <div class="grid">
+    <div class="card"><div class="n" data-en="Layer 1 · Postgres SQL" data-zh="第 1 層 · Postgres SQL"></div>
+      <h3 data-en="Structured log" data-zh="結構化日誌"></h3>
+      <p data-en="Every exchange saved as a journal entry — transcript, reply, mood, wins, themes. Powers &quot;recall this day&quot; and &quot;this month's wins&quot; with plain SQL. No AI." data-zh="每次對話存成一筆日誌 —— 逐字稿、回覆、心情、成就、主題。用純 SQL 就能做「回顧這天」「這個月的成就」。不用 AI。"></p></div>
+    <div class="card"><div class="n" data-en="Layer 2 · pgvector" data-zh="第 2 層 · pgvector"></div>
+      <h3 data-en="Semantic recall" data-zh="語意回想"></h3>
+      <p data-en="Each entry is embedded. A search_past_entries tool pulls back the top-k most relevant past moments for the current topic — the &quot;understands you right now&quot; layer." data-zh="每筆紀錄都被 embed。search_past_entries 工具依現在的主題拉回最相關的 top-k 個過去片刻 —— 「當下懂你」那一層。"></p></div>
+    <div class="card"><div class="n" data-en="Layer 3 · LLM-condensed" data-zh="第 3 層 · LLM 濃縮"></div>
+      <h3 data-en="Rolling profile" data-zh="滾動 profile"></h3>
+      <p data-en="An LLM periodically condenses the journal into a short, fixed-size profile, injected into every conversation. This is what a stateless chatbot cannot do." data-zh="LLM 定期把日誌濃縮成一份簡短、固定大小的 profile，注入每次對話。這正是無狀態聊天機器人做不到的事。"></p></div>
+    <div class="card"><div class="n" data-en="The result" data-zh="結果"></div>
+      <h3 data-en="A bounded prompt, forever" data-zh="永遠有上限的 prompt"></h3>
+      <p data-en="Every prompt = profile + relevant recalled past + today's context. The database grows without limit; the prompt does not — so cost and context never blow up." data-zh="每次 prompt = profile + 相關的回想 + 今天的脈絡。資料庫無限成長，prompt 不會 —— 所以成本和 context 永遠不會爆。"></p></div>
+  </div>
+<pre style="margin-top:26px" data-en="every prompt  =  profile (layer 3)
+              +  relevant recalled past (layer 2)
+              +  today's context
+
+# journal in Postgres can grow forever — the prompt stays a fixed size." data-zh="每次 prompt  =  profile（第 3 層）
+              +  相關的回想（第 2 層）
+              +  今天的脈絡
+
+# Postgres 裡的日誌可以無限長 —— prompt 維持固定大小。"></pre>
 </div></section>
 
 <section id="architecture"><div class="wrap">
   <div class="sec-h" data-en="Architecture" data-zh="架構"></div>
-  <h2 data-en="How a question flows through the system" data-zh="一個問題怎麼在系統裡流動"></h2>
-  <p class="lede" style="font-size:16px" data-en="Click any box to see what it does and which file it lives in — or trace a full request." data-zh="點任一方塊看它做什麼、在哪個檔案 —— 或追蹤一次完整請求。"></p>
+  <h2 data-en="One spoken exchange, end to end" data-zh="一次語音對話，從頭到尾"></h2>
+  <p class="lede" style="font-size:16px" data-en="Click any box to see what it does and which file it lives in — or trace a full request. The top flow is a single voice turn; the bottom lane is how that same exchange feeds all three memory layers." data-zh="點任一方塊看它做什麼、在哪個檔案 —— 或追蹤一次完整請求。上半是一次語音對話；下半是同一次對話怎麼餵養三層記憶。"></p>
 
   <div class="archwrap">
     <div class="diagram">
-      <div class="lane-h" data-en="Offline — ingest (runs once)" data-zh="離線 — 灌入（跑一次）"></div>
-      <div class="row3">
-        <button class="node ghost" data-node="data"><b>data/</b><small>*.md · *.pdf</small></button>
-        <span class="arr">→</span>
-        <button class="node ghost" data-node="chunk"><b>chunk + embed</b><small>rag.py</small></button>
-        <span class="arr">→</span>
-        <button class="node ghost" data-node="store"><b>Chroma</b><small>store.py</small></button>
-      </div>
-
-      <div class="lane-h" style="margin-top:22px" data-en="Per request — a question" data-zh="每次請求 — 一個問題"></div>
-      <button class="node" data-node="ui"><b>React UI</b><small>App.jsx</small></button>
+      <div class="lane-h" data-en="Per request — you speak" data-zh="每次請求 — 你開口說"></div>
+      <button class="node" data-node="browser"><b>Browser · record</b><small>frontend/App.jsx</small></button>
       <span class="v">↓</span>
-      <button class="node" data-node="api"><b>FastAPI · /agent</b><small>main.py</small></button>
+      <button class="node" data-node="api"><b>FastAPI · /talk</b><small>main.py</small></button>
+      <span class="v">↓</span>
+      <button class="node" data-node="whisper"><b>Whisper · speech→text</b><small>voice.py</small></button>
       <span class="v">↓</span>
 
       <div class="loopbox">
-        <div class="looplabel" data-en="Agent loop — repeats until Claude answers" data-zh="Agent 迴圈 — 重複到 Claude 回答為止"></div>
-        <button class="node hot" data-node="claude"><b>Claude</b><small>llm.py · decides</small></button>
-        <span class="v">↓ <span data-en="calls a tool" data-zh="呼叫工具"></span></span>
+        <div class="looplabel" data-en="Agent loop — repeats until the coach replies" data-zh="Agent 迴圈 — 重複到教練回覆為止"></div>
+        <button class="node hot" data-node="agent"><b>LangChain coach agent</b><small>agent.py · create_agent</small></button>
+        <span class="v">↓ <span data-en="each turn uses" data-zh="每一輪用到"></span></span>
         <div class="row2">
           <div class="branch">
             <div class="toolbox">
-              <button class="node outer" data-node="search"><b>search_documents</b><small>tools.py</small></button>
-              <div class="connector">↓ <span data-en="internally calls" data-zh="內部呼叫"></span></div>
-              <button class="node inner" data-node="retrieve"><b>retrieve → Chroma</b><small>rag.py · store.py</small></button>
+              <button class="node outer" data-node="profileinj"><b>profile injected</b><small>profile.py · layer 3</small></button>
+              <div class="connector">↓ <span data-en="prepended to the prompt" data-zh="接到 prompt 前面"></span></div>
+              <div class="node ghost inner"><b data-en="who you are" data-zh="你是誰"></b><small data-en="fixed size" data-zh="固定大小"></small></div>
             </div>
           </div>
           <div class="branch">
             <div class="toolbox">
-              <button class="node outer" data-node="order"><b>lookup_order</b><small>tools.py</small></button>
-              <div class="connector">↓ <span data-en="internally reads" data-zh="內部讀取"></span></div>
-              <div class="node ghost inner"><b data-en="order table" data-zh="訂單表"></b><small data-en="fake DB" data-zh="假訂單表"></small></div>
+              <button class="node outer" data-node="recall"><b>search_past_entries</b><small>recall.py · layer 2</small></button>
+              <div class="connector">↓ <span data-en="internally queries" data-zh="內部查詢"></span></div>
+              <button class="node inner" data-node="pgv"><b>pgvector · top-k</b><small>PGVector + embeddings</small></button>
             </div>
           </div>
         </div>
-        <div class="loopback" data-en="↺ tool result goes back to Claude" data-zh="↺ 工具結果送回 Claude"></div>
+        <span class="v">↓</span>
+        <button class="node hot" data-node="claude"><b>Claude replies</b><small>ChatAnthropic</small></button>
+        <div class="loopback" data-en="↺ tool results go back to the agent" data-zh="↺ 工具結果送回 agent"></div>
       </div>
 
+      <span class="v">↓ <span data-en="reply text" data-zh="回覆文字"></span></span>
+      <button class="node" data-node="tts"><b>ElevenLabs · text→speech</b><small>voice.py</small></button>
       <span class="v">↓</span>
-      <button class="node done" data-node="answer"><b>Answer + sources</b><small>→ UI</small></button>
+      <button class="node done" data-node="play"><b>Played aloud</b><small>→ browser</small></button>
+
+      <div class="lane-h" style="margin-top:26px" data-en="After every exchange — feed the three memory layers" data-zh="每次對話之後 — 餵養三層記憶"></div>
+      <div class="row3">
+        <button class="node" data-node="log"><b>1 · Postgres log</b><small>entries.py</small></button>
+        <span class="arr">+</span>
+        <button class="node" data-node="embed"><b>2 · embed → pgvector</b><small>recall.py</small></button>
+        <span class="arr">+</span>
+        <button class="node" data-node="recondense"><b>3 · re-condense profile</b><small>profile.py</small></button>
+      </div>
     </div>
 
     <aside class="detail">
@@ -217,31 +252,45 @@
   <button class="btn primary" id="traceBtn" style="margin-top:24px" data-en="▶ Trace a request" data-zh="▶ 追蹤一次請求"></button>
 </div></section>
 
-<section id="agent"><div class="wrap">
-  <div class="sec-h" data-en="The upgrade" data-zh="升級"></div>
-  <h2 data-en="From a fixed pipeline to a tool-using agent" data-zh="從固定流程到會用工具的 agent"></h2>
-  <p class="lede" style="font-size:16px" data-en="Retrieval is wrapped as a search_documents tool, alongside a lookup_order tool. The model decides which tools to call and how many times. A single question that spans both — order status and return policy — makes it call both on its own, then combine the results." data-zh="檢索被包成一個 search_documents 工具，旁邊還有一個 lookup_order 工具。模型自己決定要呼叫哪些工具、呼叫幾次。一個橫跨兩者的問題 —— 訂單狀態 + 退貨政策 —— 會讓它自己同時呼叫兩個，再把結果整合起來。"></p>
-<pre data-en="POST /agent
-{ &quot;question&quot;: &quot;Status of order 1001, and can I still return it?&quot; }
+<section id="conversation"><div class="wrap">
+  <div class="sec-h" data-en="Memory in action" data-zh="記憶實際運作"></div>
+  <h2 data-en="Why remembering changes the reply" data-zh="記得，讓回覆完全不一樣"></h2>
+  <p class="lede" style="font-size:16px" data-en="Because the coach reads your profile and recalls a similar past moment before answering, the reply is grounded in your real history instead of generic advice." data-zh="因為教練在回答前會讀你的 profile、回想一個相似的過去片刻，回覆是扎在你真實歷史上的，而不是通用建議。"></p>
+<pre data-en="POST /talk   (audio: today.webm)
 
-→ tools_used: [ &quot;lookup_order&quot;, &quot;search_documents&quot; ]
-→ answer:     order 1001 ships Jul 2, arrives Jul 5; returns
-              accepted within 14 days of receipt …" data-zh="POST /agent
-{ &quot;question&quot;: &quot;訂單 1001 的狀態，還能退嗎？&quot; }
+→ transcript:  &quot;Skipped my run again. Feels like I keep starting over.&quot;
 
-→ tools_used: [ &quot;lookup_order&quot;, &quot;search_documents&quot; ]
-→ answer:     訂單 1001 七月二號出貨、五號到；收到後
-              14 天內可退 …"></pre>
+   profile (layer 3):  goal — run 3x a week; mornings work best
+   recall  (layer 2):  a similar entry from three weeks ago
+
+→ answer:      &quot;Starting over still counts — you've strung good weeks
+                together before. Last time, laying your shoes out the
+                night before helped. Want to try that tonight?&quot;
+
+# the exchange is then saved to Postgres + embedded to pgvector,
+# and the profile re-condenses every few entries." data-zh="POST /talk   (音檔: today.webm)
+
+→ 逐字稿：   「又沒去跑步。感覺一直在重新開始。」
+
+   profile（第 3 層）：目標 — 一週跑三次；早上最順
+   回想  （第 2 層）：三週前一筆相似的紀錄
+
+→ 回答：      「重新開始也算數 —— 你以前也串起過好幾個好週。
+                上次你把鞋子前一晚先擺出來就有幫助。今晚要不要
+                也這樣試試？」
+
+# 接著這次對話會存進 Postgres + embed 進 pgvector，
+# profile 每幾筆就重新濃縮一次。"></pre>
 </div></section>
 
 <section id="decisions"><div class="wrap">
   <div class="sec-h" data-en="Design decisions" data-zh="設計決策"></div>
   <h2 data-en="Trade-offs, made on purpose" data-zh="刻意做的取捨"></h2>
   <ul class="clean">
-    <li data-en="<b>Local embeddings by default</b> — free and offline; a cloud provider is one env var away when higher retrieval quality is worth the cost." data-zh="<b>預設本地 embedding</b> —— 免費、離線；需要更高檢索品質時，切到雲端 provider 只差一個環境變數。"></li>
-    <li data-en="<b>Paragraph-aware chunking</b> — packing whole paragraphs instead of cutting every N characters keeps chunks as clean semantic units, which measurably lowered retrieval distance." data-zh="<b>段落感知切塊</b> —— 打包整段而非每 N 字硬切，讓每個 chunk 是乾淨的語意單位，明顯降低了檢索距離。"></li>
-    <li data-en="<b>Grounded by construction</b> — the system prompt limits the model to retrieved context, and answers return their sources so they're auditable." data-zh="<b>設計上就有根據</b> —— system prompt 把模型限制在檢索到的內容，答案回傳來源、可稽核。"></li>
-    <li data-en="<b>In-memory sessions</b> — right for a small service; a larger deployment swaps in Redis or a database so history survives restarts." data-zh="<b>In-memory sessions</b> —— 對小服務剛好；更大的部署換成 Redis 或資料庫，讓歷史在重啟後保留。"></li>
+    <li data-en="<b>Three memory layers instead of one</b> — a stateless chatbot forgets, and stuffing the whole history into every prompt doesn't scale. Splitting memory keeps the prompt a fixed size no matter how large the journal grows." data-zh="<b>三層記憶，而不是一層</b> —— 無狀態聊天機器人會忘記，把整段歷史塞進每次 prompt 又不 scale。把記憶拆開，不管日誌多大，prompt 都維持固定大小。"></li>
+    <li data-en="<b>LangChain on purpose</b> — agent, RAG, and memory in one industry-standard stack (create_agent + a dynamic prompt + a pgvector tool) instead of hand-rolling the tool-calling loop." data-zh="<b>刻意用 LangChain</b> —— agent、RAG、記憶一套業界標準搞定（create_agent + dynamic prompt + pgvector 工具），而不是自己手刻工具呼叫迴圈。"></li>
+    <li data-en="<b>One database for both</b> — Postgres holds the SQL journal and the pgvector embeddings side by side, so there's one store to run and back up, not two." data-zh="<b>一個資料庫兩用</b> —— Postgres 同時放 SQL 日誌和 pgvector 向量，只要顧一個儲存、備一份，而不是兩個。"></li>
+    <li data-en="<b>Per-person by construction</b> — a verified Firebase uid scopes every entry, recall, and profile, and the public repo / demo use seed data only, with no keys committed." data-zh="<b>設計上就逐人隔離</b> —— 驗過的 Firebase uid 把每筆紀錄、回想、profile 都綁到本人；公開的 repo / demo 只用種子資料，且不提交任何 key。"></li>
   </ul>
 </div></section>
 
@@ -251,16 +300,22 @@
   <div class="stack">
     <div class="chip"><b>FastAPI</b></div>
     <div class="chip">Python 3.12</div>
-    <div class="chip"><b>Chroma</b> <span style="color:var(--muted)">vector store</span></div>
-    <div class="chip"><b>Claude</b> <span style="color:var(--muted)">Anthropic API</span></div>
-    <div class="chip">uv</div>
-    <div class="chip">pytest</div>
-    <div class="chip">Pydantic</div>
+    <div class="chip"><b>LangChain</b> <span style="color:var(--muted)">agent · RAG · memory</span></div>
+    <div class="chip"><b>Claude</b> <span style="color:var(--muted)">ChatAnthropic</span></div>
+    <div class="chip"><b>Whisper</b> <span style="color:var(--muted)">STT</span></div>
+    <div class="chip"><b>ElevenLabs</b> <span style="color:var(--muted)">TTS</span></div>
+    <div class="chip"><b>Postgres + pgvector</b></div>
+    <div class="chip">OpenAI embeddings</div>
+    <div class="chip"><b>Firebase Auth</b></div>
+    <div class="chip">LangSmith</div>
+    <div class="chip">React (Vite)</div>
+    <div class="chip">GitHub Actions</div>
+    <div class="chip"><b>Google Cloud</b> <span style="color:var(--muted)">Run · SQL · Secrets</span></div>
   </div>
 </div></section>
 
 <footer><div class="wrap">
-  <span data-en="Doc AI Assistant · FastAPI + Claude · " data-zh="Doc AI Assistant · FastAPI + Claude · "></span>
+  <span data-en="Daily Coach · FastAPI + LangChain + Claude · " data-zh="Daily Coach · FastAPI + LangChain + Claude · "></span>
   <a href="https://github.com/srichsun/doc-ai-assistant" target="_blank" rel="noopener" style="color:var(--accent)">GitHub</a>
 </div></footer>
 
@@ -268,40 +323,49 @@
 (function(){
   var lang = "en";
   var els = document.querySelectorAll("[data-en]");
-  var currentNode = "ui";
+  var currentNode = "agent";
 
   // What each box does + which file it lives in. [title, description] per language.
   var NODES = {
-    data:{file:"data/*.md · *.pdf",
-      en:["Source documents","Your source files. Read once, offline, before any question is asked."],
-      zh:["來源文件","你的來源文件。在被問問題之前，離線讀取一次。"]},
-    chunk:{file:"app/rag.py · scripts/ingest.py",
-      en:["Chunk + embed","Splits documents into paragraph-aware chunks, turns each into a vector, and stores them."],
-      zh:["切塊 + embed","把文件切成段落感知的 chunk，各自轉成向量後存起來。"]},
-    store:{file:"app/store.py",
-      en:["Chroma — vector store","The embedded vector database. Holds the chunk vectors; there is no external DB to run."],
-      zh:["Chroma — 向量庫","內嵌的向量資料庫。存放 chunk 向量；不用另外架 DB。"]},
-    ui:{file:"frontend/src/App.jsx",
-      en:["React UI","The browser chat. You type a question; it POSTs to /agent and renders the answer plus the tool and source tags."],
-      zh:["React 前端","瀏覽器聊天畫面。你輸入問題，它 POST /agent，並把答案和工具/來源標籤畫出來。"]},
+    browser:{file:"frontend/src/App.jsx",
+      en:["Browser · record","Tap the mic and talk. The browser records the audio and POSTs it to /talk with your Firebase sign-in token attached."],
+      zh:["瀏覽器 · 錄音","點麥克風開口說。瀏覽器把音檔錄下來，帶著你的 Firebase 登入 token POST 到 /talk。"]},
     api:{file:"app/main.py",
-      en:["FastAPI · /agent","The web layer. Receives the request, applies CORS, validates it with Pydantic, and hands the question to the agent."],
-      zh:["FastAPI · /agent","Web 層。接收請求、處理 CORS、用 Pydantic 驗證，再把問題交給 agent。"]},
-    claude:{file:"app/llm.py",
-      en:["Claude — the brain","Given the question and the tool list, it decides: answer now, or call a tool first — and which one."],
-      zh:["Claude — 大腦","拿到問題和工具清單後，它決定：直接回答，還是先呼叫某個工具（哪一個）。"]},
-    search:{file:"app/tools.py",
-      en:["search_documents — the interface Claude sees","This is the whole tool call, from Claude's side: give it a query, get matching passages back. What happens inside (retrieve → Chroma, below) is an implementation detail Claude never sees."],
-      zh:["search_documents —— Claude 看到的介面","這就是完整的一次工具呼叫，從 Claude 的角度看：給它 query，拿回命中的段落。裡面實際發生的事（下面的 retrieve → Chroma）是 Claude 看不到的實作細節。"]},
-    retrieve:{file:"app/rag.py · app/store.py",
-      en:["retrieve → Chroma — what search_documents does inside","Not a separate step — this runs inside the tool call above. Embeds the question and asks Chroma for the most similar chunks. Runs locally, no API key."],
-      zh:["retrieve → Chroma —— search_documents 內部在做的事","不是另外一步 —— 這是在上面那次工具呼叫「裡面」跑的。把問題轉成向量，向 Chroma 要最相似的片段。本地跑，免 API key。"]},
-    order:{file:"app/tools.py",
-      en:["lookup_order — a second, non-document tool","Same shape as search_documents: an interface Claude calls, which internally reads a small fake order table. Shows the agent isn't limited to document search."],
-      zh:["lookup_order —— 第二個非文件類工具","跟 search_documents 同樣的結構：Claude 呼叫的介面，內部讀一張假訂單表。示範 agent 不是只能查文件。"]},
-    answer:{file:"app/agent.py → app/main.py",
-      en:["Answer + sources","Claude's final answer, plus which tools it used and which documents it searched — returned as JSON to the UI."],
-      zh:["答案 + 來源","Claude 的最終答案，加上用了哪些工具、查了哪些文件 —— 以 JSON 回傳前端。"]}
+      en:["FastAPI · /talk","The web layer. Verifies your sign-in token, scopes everything to you, and passes the audio on. Protected endpoints require sign-in."],
+      zh:["FastAPI · /talk","Web 層。驗證你的登入 token、把所有東西綁到你身上，再把音檔往下傳。受保護的 endpoint 都要登入。"]},
+    whisper:{file:"app/voice.py",
+      en:["Whisper · speech → text","OpenAI Whisper transcribes your recording into text — the words the coach will actually read."],
+      zh:["Whisper · 語音轉文字","OpenAI Whisper 把你的錄音轉成文字 —— 這才是教練真正會讀到的內容。"]},
+    agent:{file:"app/agent.py",
+      en:["LangChain coach agent","Built with create_agent + Claude. It runs the whole “think, maybe call a tool, repeat” loop for us, and decides on its own when recalling a past moment would help."],
+      zh:["LangChain 教練 agent","用 create_agent + Claude 打造。它幫我們跑完整個「思考、可能呼叫工具、重複」的迴圈，並自己決定什麼時候回想過去會有幫助。"]},
+    profileinj:{file:"app/profile.py",
+      en:["Profile injected — memory layer 3","Before every reply, your rolling profile (goals, habits, triggers, what helps) is prepended to the prompt. It's LLM-condensed and fixed-size, so the coach always talks with a fresh sense of who you are — without re-reading your whole history."],
+      zh:["注入 profile —— 記憶第 3 層","每次回覆前，把你的滾動 profile（目標、習慣、地雷、什麼有用）接到 prompt 前面。它由 LLM 濃縮、大小固定，所以教練總是帶著對你最新的理解說話，卻不用重讀整段歷史。"]},
+    recall:{file:"app/recall.py",
+      en:["search_past_entries — memory layer 2","The one tool the coach can call. Give it the current topic; it returns the most relevant past entries. This is the “understands you right now” layer — episodic memory, separate from the plain-SQL day/wins queries."],
+      zh:["search_past_entries —— 記憶第 2 層","教練唯一能呼叫的工具。給它現在的主題，它回傳最相關的過去紀錄。這是「當下懂你」那一層 —— 情節記憶，跟純 SQL 的日/成就查詢分開。"]},
+    pgv:{file:"app/recall.py · PGVector",
+      en:["pgvector · top-k — what the tool does inside","Not a separate step — this runs inside the tool call above. Embeds the query and asks pgvector for the top-k closest past entries. Top-k is fixed, so the recalled slice stays constant no matter how big the journal grows."],
+      zh:["pgvector · top-k —— 工具內部在做的事","不是另外一步 —— 這是在上面那次工具呼叫「裡面」跑的。把 query 轉成向量，向 pgvector 要最接近的 top-k 筆過去紀錄。top-k 固定，所以不管日誌變多大，回想的那一片都維持固定大小。"]},
+    claude:{file:"app/agent.py · ChatAnthropic",
+      en:["Claude replies","With your profile and any recalled entries in hand, Claude writes the coach's reply — warm, short, and grounded in your real history instead of guessing."],
+      zh:["Claude 回覆","手上有你的 profile 和回想到的紀錄後，Claude 寫出教練的回覆 —— 溫暖、簡短、扎在你真實的歷史上，而不是亂猜。"]},
+    tts:{file:"app/voice.py",
+      en:["ElevenLabs · text → speech","The reply is read aloud in a warm British voice. ElevenLabs is the default; OpenAI TTS is a drop-in fallback behind the same speak() call."],
+      zh:["ElevenLabs · 文字轉語音","回覆用溫暖的英式嗓音唸出來。ElevenLabs 是預設；OpenAI TTS 是同一個 speak() 後面可直接替換的備援。"]},
+    play:{file:"frontend/src/App.jsx",
+      en:["Played aloud","The browser plays the mp3, so you hear the coach answer. One exchange, done — and now it becomes memory."],
+      zh:["唸出來播放","瀏覽器播放 mp3，你就聽到教練的回答。一次對話完成 —— 接著它變成記憶。"]},
+    log:{file:"app/entries.py",
+      en:["Memory layer 1 · structured log","Every exchange is saved to Postgres as a journal entry — transcript, reply, plus mood / wins / themes the coach pulls out. Plain SQL powers “recall this day” and “this month's wins”. No AI needed."],
+      zh:["記憶第 1 層 · 結構化日誌","每次對話都存進 Postgres 成一筆日誌 —— 逐字稿、回覆，加上教練抽出的心情 / 成就 / 主題。純 SQL 就能做「回顧這天」「這個月的成就」。不用 AI。"]},
+    embed:{file:"app/recall.py",
+      en:["Memory layer 2 · embed","The same entry is embedded and stored in pgvector, keyed by its SQL row id — so re-indexing overwrites, never duplicates. That's what makes it findable by future searches."],
+      zh:["記憶第 2 層 · embed","同一筆紀錄被 embed 後存進 pgvector，用它的 SQL row id 當 key —— 所以重新索引是覆蓋，不會重複。這讓它未來被搜尋得到。"]},
+    recondense:{file:"app/profile.py",
+      en:["Memory layer 3 · re-condense","Every few entries, an LLM folds recent journal into your profile — keeping what's still true, dropping one-off trivia. It's how the coach steadily gets to know you while the profile stays a fixed size."],
+      zh:["記憶第 3 層 · 重新濃縮","每幾筆紀錄，就由 LLM 把最近的日誌摺進你的 profile —— 留下還成立的、丟掉一次性瑣事。這就是教練持續認識你、而 profile 又維持固定大小的方法。"]}
   };
 
   function renderDetail(id){
@@ -334,16 +398,16 @@
     });
   });
 
-  // Trace: light up the boxes along a real request, in order (Claude appears
-  // twice because the loop returns to it before answering).
-  var TRACE = ["ui","api","claude","search","retrieve","claude","answer"];
+  // Trace: light up the boxes along a real request, in order — a full voice turn
+  // (Claude comes after the agent recalls), then the three memory-layer writes.
+  var TRACE = ["browser","api","whisper","agent","profileinj","recall","pgv","agent","claude","tts","play","log","embed","recondense"];
   var timers = [];
   document.getElementById("traceBtn").addEventListener("click", function(){
     timers.forEach(clearTimeout); timers = [];
     TRACE.forEach(function(id, i){
       timers.push(setTimeout(function(){
         currentNode = id; renderDetail(id);
-      }, i * 850));
+      }, i * 820));
     });
   });
 
