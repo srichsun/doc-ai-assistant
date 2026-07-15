@@ -89,6 +89,14 @@ def agent_stream(req: TalkRequest, uid: str = Depends(auth.current_user)):
     )
 
 
+@app.post("/transcribe")
+async def transcribe(audio: UploadFile = File(...), uid: str = Depends(auth.current_user)):
+    """Turn recorded audio into text (Whisper only). The browser then streams
+    the reply via /agent/stream, so voice replies type out live like typed ones."""
+    data = await audio.read()
+    return {"text": voice.transcribe(data, audio.filename or "audio.webm")}
+
+
 @app.post("/talk", response_model=TalkResponse)
 async def talk(
     audio: UploadFile = File(...),

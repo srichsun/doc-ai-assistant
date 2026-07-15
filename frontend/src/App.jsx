@@ -136,19 +136,15 @@ export default function App() {
     }
   }
 
-  // Send a typed message.
-  async function send() {
-    const text = input.trim();
-    if (!text || loading) return;
-
-    setMessages((prev) => [...prev, { role: "user", text }]);
-    setInput("");
-    setLoading(true); // shows the typing dots until the first token arrives
+  // Stream the coach's reply to a question into a new assistant bubble, typing
+  // it out live. Shared by typed and voice input.
+  async function streamReply(question) {
+    setLoading(true); // typing dots until the first token arrives
     try {
       const res = await authFetch(`${API}/agent/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, session_id: getSessionId() }),
+        body: JSON.stringify({ question, session_id: getSessionId() }),
       });
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -180,6 +176,15 @@ export default function App() {
     }
   }
 
+  // Send a typed message.
+  async function send() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setMessages((prev) => [...prev, { role: "user", text }]);
+    setInput("");
+    await streamReply(text);
+  }
+
   // Start/stop recording. On stop, the audio is sent to /talk.
   async function toggleRecord() {
     if (recording) {
@@ -199,29 +204,27 @@ export default function App() {
     setRecording(true);
   }
 
-  // Upload recorded audio: Whisper transcribes it, the coach replies.
+  // Upload recorded audio: Whisper transcribes it, then the reply streams in —
+  // same streaming path as typing, so voice replies aren't a long wait.
   async function sendAudio(blob) {
     setRecording(false);
     setLoading(true);
+    let text;
     try {
       const form = new FormData();
       form.append("audio", blob, "clip.webm");
-      form.append("session_id", getSessionId());
-      const res = await authFetch(`${API}/talk`, { method: "POST", body: form });
-      const data = await res.json();
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", text: data.transcript || "🎤 (voice)" },
-        { role: "assistant", text: data.answer },
-      ]);
+      const res = await authFetch(`${API}/transcribe`, { method: "POST", body: form });
+      text = (await res.json()).text;
     } catch {
+      setLoading(false);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", text: "Sorry — I couldn't hear that." },
       ]);
-    } finally {
-      setLoading(false);
+      return;
     }
+    setMessages((prev) => [...prev, { role: "user", text: text || "🎤 (voice)" }]);
+    await streamReply(text);
   }
 
   // Before the first auth check, show nothing to avoid a sign-in flash.
