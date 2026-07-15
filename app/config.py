@@ -31,16 +31,16 @@ EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
-# Voice output (TTS). "openai" uses the paid OpenAI key (generous quota);
-# "elevenlabs" sounds more real but its free tier runs out fast. Swappable.
-TTS_PROVIDER = os.getenv("TTS_PROVIDER", "openai")
+# Voice output (TTS). "elevenlabs" (real-sounding, paid plan) is the default;
+# "openai" (coral etc.) is a swappable fallback on the OpenAI key.
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "elevenlabs")
 # OpenAI TTS voice (used when TTS_PROVIDER=openai): coral/shimmer/nova are warm
 # and female; fable is British-leaning. Any of the gpt-4o-mini-tts voices work.
 TTS_VOICE = os.getenv("TTS_VOICE", "coral")
-# ElevenLabs (used when TTS_PROVIDER=elevenlabs). Default voice is "Alice",
-# a clear British female; override ELEVENLABS_VOICE_ID to pick another.
+# ElevenLabs (used when TTS_PROVIDER=elevenlabs). The user's chosen library
+# voice; override ELEVENLABS_VOICE_ID to pick another.
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "Xb7hH8MSUJpSbSDYk0k2")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "aj0fZfXTBc7E3By4X8L2")
 ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2")
 
 # Firebase Admin service-account file, used to verify sign-in tokens.
