@@ -7,8 +7,10 @@ import {
   signOutUser,
 } from "./firebase";
 
-// Where the FastAPI backend runs.
-const API = "http://127.0.0.1:8000";
+// Where the FastAPI backend runs. In the deployed build the frontend is served
+// by the same server, so VITE_API_BASE is "" (same origin); local dev falls
+// back to the separate dev server.
+const API = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
 // One random id per browser, saved so it survives page reloads.
 function getSessionId() {

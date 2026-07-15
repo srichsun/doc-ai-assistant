@@ -1,9 +1,11 @@
 """FastAPI entrypoint for the life-coach journaling app."""
+import os
 from datetime import date, datetime, timezone
 
 from fastapi import Depends, FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import agent, auth, db, entries, profile, voice
@@ -128,3 +130,11 @@ def refresh_profile(uid: str = Depends(auth.current_user)):
     """Force a re-condense of the profile from recent entries (normally this
     happens on its own every few entries)."""
     return {"profile": profile.refresh_profile(uid)}
+
+
+# Serve the built React frontend (if present) so the whole app lives at one URL.
+# Mounted last, at "/", so the API routes above always take precedence; only
+# unmatched paths (the SPA and its assets) fall through to the static files.
+# Absent in local dev, where the frontend runs on its own Vite server.
+if os.path.isdir("frontend/dist"):
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="web")
