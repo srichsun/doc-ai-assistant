@@ -41,7 +41,7 @@ TTS_VOICE = os.getenv("TTS_VOICE", "coral")
 # voice; override ELEVENLABS_VOICE_ID to pick another.
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "NtS6nEHDYMQC9QczMQuq")
-ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2")
+ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5")
 
 # Firebase Admin service-account file, used to verify sign-in tokens.
 FIREBASE_CREDENTIALS = os.getenv(
