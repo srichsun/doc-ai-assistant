@@ -46,7 +46,9 @@ def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
     """
     buf = io.BytesIO(audio)
     buf.name = filename
-    result = _openai.audio.transcriptions.create(model="whisper-1", file=buf)
+    result = _openai.audio.transcriptions.create(
+        model=config.STT_MODEL, file=buf
+    )
     return result.text
 
 

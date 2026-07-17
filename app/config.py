@@ -23,8 +23,11 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql+psycopg://coach:coach@localhost:5433/coach"
 )
 
-# OpenAI key (Whisper STT, embeddings, and the chat model when LLM_PROVIDER=openai).
+# OpenAI key (STT, embeddings, and the chat model when LLM_PROVIDER=openai).
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Speech-to-text. gpt-4o-mini-transcribe is newer and more accurate than
+# whisper-1, at a similar price.
+STT_MODEL = os.getenv("STT_MODEL", "gpt-4o-mini-transcribe")
 # Embedding model for semantic recall over past entries (pgvector).
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
