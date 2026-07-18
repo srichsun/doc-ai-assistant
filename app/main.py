@@ -119,8 +119,10 @@ def entries_on_day(day: str | None = None, uid: str = Depends(auth.current_user)
 
 @app.get("/wins")
 def wins(uid: str = Depends(auth.current_user)):
-    """List the most recent entries where the coach recorded a win."""
-    return {"wins": [_entry_dict(r) for r in entries.recent_wins(user_id=uid)]}
+    """List the entries where the coach recorded wins, newest first (for the
+    review screen)."""
+    rows = entries.recent_wins(user_id=uid, limit=200)
+    return {"wins": [_entry_dict(r) for r in rows]}
 
 
 @app.get("/profile")

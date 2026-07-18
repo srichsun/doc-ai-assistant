@@ -119,7 +119,14 @@ class EntryTags(BaseModel):
         None, description="one word for the person's mood, e.g. anxious, proud, calm"
     )
     wins: str | None = Field(
-        None, description="a short win the person mentioned, else null"
+        None,
+        description=(
+            "ALL the good things from what they shared today — big wins, small wins, "
+            "kind things they did, moments of growth or self-awareness, things to be "
+            "grateful for. Format as a markdown bullet list ('- ...'), each item "
+            "concrete and specific with a short hint of why it mattered. Null only if "
+            "there is genuinely nothing good in what they said."
+        ),
     )
     themes: str | None = Field(
         None, description="comma-separated topics, e.g. work, health, family"
@@ -133,8 +140,13 @@ _extractor = _default_model().with_structured_output(EntryTags)
 def extract_tags(transcript: str, reply: str) -> EntryTags:
     """Pull mood / wins / themes out of one exchange."""
     prompt = (
-        "From this journaling exchange, extract the person's mood, any win they "
-        "mentioned, and the main themes. Use null when something isn't there.\n"
+        "From this journaling exchange, extract:\n"
+        "- mood: one word.\n"
+        "- wins: a markdown bullet list of ALL the good things today — big and small "
+        "wins, kind acts, growth, and things to be grateful for — each concrete and "
+        "specific with a hint of why it mattered.\n"
+        "- themes: comma-separated topics.\n"
+        "Use null only when something genuinely isn't there.\n"
         f"Person: {transcript}\nCoach: {reply}"
     )
     return _extractor.invoke(prompt)

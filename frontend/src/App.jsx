@@ -49,6 +49,8 @@ export default function App() {
   const [input, setInput] = useState("");        // what's typed in the box
   const [loading, setLoading] = useState(false); // waiting for a reply?
   const [recording, setRecording] = useState(false);
+  const [view, setView] = useState("chat");      // "chat" or "wins" (the review)
+  const [wins, setWins] = useState([]);          // entries that recorded wins
 
   // Track sign-in state; runs once on mount.
   useEffect(() => {
@@ -98,6 +100,26 @@ export default function App() {
       cancelled = true;
     };
   }, [user]);
+
+  // Load the wins review (entries that recorded wins, newest first) when the
+  // person opens that tab.
+  useEffect(() => {
+    if (!user || view !== "wins") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch(`${API}/wins`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setWins(data.wins || []);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, view]);
 
   // Read one reply aloud — called from a tap on its speaker button. Tapping the
   // same button again while it's playing stops it.
@@ -256,8 +278,40 @@ export default function App() {
             Sign out
           </button>
         </div>
+        <div className="tabs">
+          <button
+            className={view === "chat" ? "on" : ""}
+            onClick={() => setView("chat")}
+          >
+            Talk
+          </button>
+          <button
+            className={view === "wins" ? "on" : ""}
+            onClick={() => setView("wins")}
+          >
+            🏆 Wins
+          </button>
+        </div>
       </header>
 
+      {view === "wins" ? (
+        <main className="chat wins-view">
+          {wins.length === 0 && (
+            <p className="empty">Your wins will show up here as you talk.</p>
+          )}
+          {groupByDay(wins).map(([day, items]) => (
+            <section key={day} className="winday">
+              <h3>{day}</h3>
+              {items.map((e) => (
+                <div key={e.id} className="md winblock">
+                  <ReactMarkdown>{e.wins}</ReactMarkdown>
+                </div>
+              ))}
+            </section>
+          ))}
+        </main>
+      ) : (
+      <>
       <main className="chat">
         {messages.length === 0 && (
           <p className="empty">Say or type how your day is going.</p>
@@ -316,6 +370,19 @@ export default function App() {
         />
         <button disabled={loading}>Send</button>
       </form>
+      </>
+      )}
     </div>
   );
+}
+
+// Group win-entries by their calendar day (newest first), keeping order.
+function groupByDay(items) {
+  const map = new Map();
+  for (const e of items) {
+    const day = (e.created_at || "").slice(0, 10);
+    if (!map.has(day)) map.set(day, []);
+    map.get(day).push(e);
+  }
+  return [...map.entries()];
 }
