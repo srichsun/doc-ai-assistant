@@ -1,37 +1,35 @@
-/* A centered chat column: header, scrolling messages, input bar. */
+/* A wide app: compact top bar, scrolling messages, input bar. */
 .app {
-  max-width: 720px;
+  max-width: 1200px;
   height: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  padding: 0 20px;
+  padding: 0 28px;
 }
 
-/* Header */
+/* Header — a compact horizontal bar so the chat gets the vertical space. */
 .head {
-  padding: 40px 4px 24px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding: 16px 4px 14px;
   border-bottom: 1px solid var(--line);
 }
 .head h1 {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Fraunces", Georgia, "Times New Roman", serif;
   font-weight: 500;
-  font-size: 30px;
+  font-size: 24px;
   letter-spacing: 0.01em;
+  margin: 0 auto 0 0;          /* title left, push the rest to the right */
 }
-.head h1::after {
-  content: "";
-  display: block;
-  width: 40px;
-  height: 2px;
-  margin-top: 12px;
-  background: var(--gold);
-}
-.head p {
-  margin-top: 14px;
-  color: var(--muted);
-  font-size: 15px;
-}
+.head p { display: none; }     /* drop the subtitle to reclaim vertical space */
+
+/* The signed-out gate keeps the taller, centered look. */
+.app.gate .head { display: block; padding: 40px 4px 24px; }
+.app.gate .head h1 { font-size: 30px; margin: 0; }
+.app.gate .head p { display: block; margin-top: 14px; color: var(--muted); font-size: 15px; }
 
 /* Messages */
 .chat {
@@ -50,12 +48,21 @@
 
 .msg {
   max-width: 82%;
-  padding: 13px 17px;
+  padding: 14px 19px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 16px;
   white-space: pre-wrap;      /* keep line breaks from the answer */
   animation: rise 0.35s ease both;
 }
+/* The coach's reflections read like an elegant, literary letter. */
+.msg.assistant .md,
+.winblock {
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.7;
+  letter-spacing: 0.006em;
+}
+.gate .head h1 { font-family: "Fraunces", Georgia, serif; }
 @keyframes rise {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -198,9 +205,8 @@
 .head .who {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 12px;
-  margin-top: 10px;
+  margin: 0;
   font-size: 13px;
   color: var(--muted);
 }
@@ -258,8 +264,7 @@
 .head .tabs {
   display: flex;
   gap: 8px;
-  justify-content: center;
-  margin-top: 12px;
+  margin: 0;
 }
 .head .tabs button {
   background: transparent;

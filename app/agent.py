@@ -121,11 +121,13 @@ class EntryTags(BaseModel):
     wins: str | None = Field(
         None,
         description=(
-            "ALL the good things from what they shared today — big wins, small wins, "
-            "kind things they did, moments of growth or self-awareness, things to be "
-            "grateful for. Format as a markdown bullet list ('- ...'), each item "
-            "concrete and specific with a short hint of why it mattered. Null only if "
-            "there is genuinely nothing good in what they said."
+            "The 3-5 most MEANINGFUL wins of the day — not a chore log. For each, "
+            "give two parts: a short wise insight naming the MEANING (coach voice, "
+            "like a headline: 'You stopped preparing and started participating'), "
+            "then the concrete detail behind it. Draw the insight from the wisest "
+            "observations in the coach's reply; skip routine facts with no "
+            "significance. Format each as '**[insight]**' then the detail on the next "
+            "line. Null only if there is genuinely nothing meaningful."
         ),
     )
     themes: str | None = Field(
@@ -142,9 +144,10 @@ def extract_tags(transcript: str, reply: str) -> EntryTags:
     prompt = (
         "From this journaling exchange, extract:\n"
         "- mood: one word.\n"
-        "- wins: a markdown bullet list of ALL the good things today — big and small "
-        "wins, kind acts, growth, and things to be grateful for — each concrete and "
-        "specific with a hint of why it mattered.\n"
+        "- wins: the 3-5 most MEANINGFUL wins of the day (not a chore log). For each, "
+        "a short wise insight naming the meaning (coach voice, like a headline), then "
+        "the concrete detail. Draw the insight from the wisest lines in the coach's "
+        "reply; skip routine facts. Format each as '**[insight]**' then the detail.\n"
         "- themes: comma-separated topics.\n"
         "Use null only when something genuinely isn't there.\n"
         f"Person: {transcript}\nCoach: {reply}"
