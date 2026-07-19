@@ -3,11 +3,10 @@
 The coach is driven by a fake, offline chat model, so these tests spend no
 tokens and need no API key.
 """
-from datetime import datetime, timezone
-
 from langchain_core.language_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
+from app.core import clock, security
 from app.services import agent, entries
 
 
@@ -29,13 +28,54 @@ def test_coach_replies(monkeypatch):
     assert result == {"answer": "you've got this", "session_id": None}
 
 
-def test_coach_remembers_within_a_session(monkeypatch):
-    monkeypatch.setattr(agent, "_agent", _coach_with(["hi there", "second reply"]))
-    agent.run("first message", session_id="s-1")
-    result = agent.run("second message", session_id="s-1")
-    # Same session id -> the same agent handled both turns, in order.
-    assert result["answer"] == "second reply"
-    assert result["session_id"] == "s-1"
+def test_coach_replays_todays_conversation(sqlite_db, monkeypatch):
+    """Memory comes from the journal, not from the caller's session id — which
+    is what lets a conversation continue on another device or after a restart."""
+    entries.save_entry("I was nervous", "tell me more", user_id="u1")
+    seen = {}
+    monkeypatch.setattr(
+        agent,
+        "_agent",
+        type(
+            "Spy",
+            (),
+            {"invoke": lambda self, state: seen.update(state) or {
+                "messages": [AIMessage("ok")]
+            }},
+        )(),
+    )
+    security.current_uid.set("u1")
+
+    agent.run("and then?", session_id="a-different-device")
+
+    assert seen["messages"] == [
+        {"role": "user", "content": "I was nervous"},
+        {"role": "assistant", "content": "tell me more"},
+        {"role": "user", "content": "and then?"},
+    ]
+
+
+def test_history_drops_oldest_when_a_day_runs_long(sqlite_db, monkeypatch):
+    """The safety valve trims the oldest exchanges rather than letting the
+    request blow past the model's context limit."""
+    monkeypatch.setattr(agent, "MAX_HISTORY_CHARS", 100)
+    entries.save_entry("x" * 80, "y" * 80, user_id="u1")  # oldest, too big
+    entries.save_entry("recent", "reply", user_id="u1")
+
+    history = agent._history("u1")
+
+    assert history == [
+        {"role": "user", "content": "recent"},
+        {"role": "assistant", "content": "reply"},
+    ]
+
+
+def test_history_is_empty_when_the_journal_cannot_be_read(monkeypatch):
+    """A database hiccup must never swallow the person's message."""
+    monkeypatch.setattr(
+        agent.entries, "entries_on", lambda *a, **k: (_ for _ in ()).throw(OSError())
+    )
+    assert agent._history("u1") == []
 
 
 def test_chat_and_log_saves_a_journal_entry(sqlite_db, monkeypatch):
@@ -58,7 +98,7 @@ def test_chat_and_log_saves_a_journal_entry(sqlite_db, monkeypatch):
     assert result["answer"] == "proud of you"
 
     # The exchange should now be in the database, owned by u1.
-    saved = entries.entries_on(datetime.now(timezone.utc).date(), user_id="u1")
+    saved = entries.entries_on(clock.today(), user_id="u1")
     assert len(saved) == 1
     assert saved[0].transcript == "I ran 5k today"
     assert saved[0].mood == "proud"

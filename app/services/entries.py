@@ -5,11 +5,11 @@ see each other's journal. Recalling a day or listing this month's wins is just
 a filtered query by date/column; no AI needed. (Semantic "find similar past
 moments" lives in recall.py with pgvector.)
 """
-from datetime import date, datetime, time, timezone
+from datetime import date
 
 from sqlalchemy import func, select
 
-from app.core import db
+from app.core import clock, db
 from app.models import Entry
 
 
@@ -41,9 +41,8 @@ def save_entry(
 
 
 def entries_on(day: date, user_id: str | None = None) -> list[Entry]:
-    """One person's entries created on a given calendar day (UTC), oldest first."""
-    start = datetime.combine(day, time.min, tzinfo=timezone.utc)
-    end = datetime.combine(day, time.max, tzinfo=timezone.utc)
+    """One person's entries from a given journal day, oldest first."""
+    start, end = clock.day_bounds(day)
     with db.get_session() as s:
         stmt = (
             select(Entry)

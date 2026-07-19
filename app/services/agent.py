@@ -2,21 +2,20 @@
 
 LangChain's create_agent gives us the whole "call the model, run any tools,
 loop until it's done" cycle for free, so we don't hand-write that loop anymore.
-Conversation memory is handled by a checkpointer keyed on the session id:
-same id -> same remembered conversation.
+Conversation memory is the journal itself: every turn is already saved, so the
+coach picks up today's conversation by replaying it from the database. That
+keeps one source of truth, and means the conversation survives a restart and
+follows the person from laptop to phone.
 
 The coach has one tool, search_past_entries, which lets it recall relevant
 past journal entries mid-conversation (semantic memory over pgvector).
 """
-import uuid
-
 from langchain.agents import create_agent
 from langchain.agents.middleware import dynamic_prompt
 from langchain_core.messages import AIMessageChunk
-from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel, Field
 
-from app.core import security
+from app.core import clock, security
 from app.services import chat_model, entries, profile, recall
 
 SYSTEM_PROMPT = """You are this person's personal coach and thinking partner — someone who has known them a long time and genuinely cares how their life is going. If you know their name, use it naturally.
@@ -75,37 +74,60 @@ def build_agent(model, tools=None, middleware=None):
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
         middleware=middleware,
-        checkpointer=InMemorySaver(),
     )
 
 
 # Built once at startup and reused for every request.
 _agent = build_agent(_default_model())
 
+# A whole day of conversation is replayed on every turn. This cap is only a
+# safety valve for a pathological day — a heavy day of ~40 exchanges is around
+# 46k characters, so normal use never comes close. Past it, the oldest
+# exchanges drop out (the profile and semantic recall still cover them) rather
+# than the request failing outright on the model's context limit.
+MAX_HISTORY_CHARS = 120_000
 
-def _thread_id(session_id: str | None) -> str:
-    """Conversation-memory key: user id + session id.
 
-    Scoping by user matters — the session id lives in browser localStorage, so
-    two Google accounts on the same machine would otherwise share one memory.
-    No session id means a one-off turn (throwaway id, nothing bleeds).
+def _history(user_id: str | None) -> list[dict]:
+    """Today's conversation so far, as chat messages, oldest first.
+
+    Reading it back from the journal — instead of holding it in memory — is
+    what lets the coach continue the same conversation after a redeploy, and
+    on a different device. Never fatal: if the journal can't be read we simply
+    start fresh rather than lose the person's message.
     """
-    if not session_id:
-        return f"anon-{uuid.uuid4()}"
-    return f"{security.current_uid.get() or 'anon'}:{session_id}"
+    try:
+        rows = entries.entries_on(clock.today(), user_id=user_id)
+    except Exception:
+        return []
+
+    # Walk newest-first so the cap drops the oldest exchanges, then flip back.
+    messages: list[dict] = []
+    chars = 0
+    for e in reversed(rows):
+        chars += len(e.transcript) + len(e.ai_reply)
+        if chars > MAX_HISTORY_CHARS:
+            break
+        messages.append({"role": "assistant", "content": e.ai_reply})
+        messages.append({"role": "user", "content": e.transcript})
+    messages.reverse()
+    return messages
+
+
+def _turn(message: str, user_id: str | None) -> list[dict]:
+    """Today's conversation plus the message just spoken."""
+    return _history(user_id) + [{"role": "user", "content": message}]
 
 
 def run(message: str, session_id: str | None = None) -> dict:
     """Send one message to the coach and get its reply.
 
-    Pass the same session_id across turns to keep the conversation's memory.
+    The coach sees everything said today; session_id is only echoed back for
+    the caller's bookkeeping.
 
     Returns {"answer", "session_id"}.
     """
-    cfg = {"configurable": {"thread_id": _thread_id(session_id)}}
-    result = _agent.invoke(
-        {"messages": [{"role": "user", "content": message}]}, cfg
-    )
+    result = _agent.invoke({"messages": _turn(message, security.current_uid.get())})
     reply = result["messages"][-1].content  # the coach's latest reply text
     return {"answer": reply, "session_id": session_id}
 
@@ -206,11 +228,9 @@ def stream_and_log(
     """Stream the coach's reply token by token (for a typewriter effect), then
     save the exchange once it's complete. Yields plain text chunks."""
     security.current_uid.set(user_id)
-    cfg = {"configurable": {"thread_id": _thread_id(session_id)}}
     parts = []
     for chunk, _meta in _agent.stream(
-        {"messages": [{"role": "user", "content": message}]},
-        cfg,
+        {"messages": _turn(message, user_id)},
         stream_mode="messages",
     ):
         # Only the coach's own text tokens (not tool-call plumbing).

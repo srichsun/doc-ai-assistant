@@ -1,9 +1,10 @@
 """Reading back the journal — one day's entries, and the wins review."""
-from datetime import date, datetime, timezone
+from datetime import date
 
 from fastapi import APIRouter
 
 from app.api.deps import CurrentUser
+from app.core import clock
 from app.models import Entry
 from app.services import entries
 
@@ -28,8 +29,8 @@ def _entry_dict(e: Entry) -> dict:
 
 @router.get("/entries")
 def entries_on_day(uid: CurrentUser, day: str | None = None):
-    """Recall one day's entries. `day` is YYYY-MM-DD; defaults to today (UTC)."""
-    d = date.fromisoformat(day) if day else datetime.now(timezone.utc).date()
+    """Recall one day's entries. `day` is YYYY-MM-DD; defaults to today."""
+    d = date.fromisoformat(day) if day else clock.today()
     rows = entries.entries_on(d, user_id=uid)
     return {"day": d.isoformat(), "entries": [_entry_dict(r) for r in rows]}
 
