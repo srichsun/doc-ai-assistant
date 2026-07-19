@@ -49,8 +49,8 @@ export default function App() {
   const [input, setInput] = useState("");        // what's typed in the box
   const [loading, setLoading] = useState(false); // waiting for a reply?
   const [recording, setRecording] = useState(false);
-  const [view, setView] = useState("chat");      // "chat" or "wins" (the review)
-  const [wins, setWins] = useState([]);          // entries that recorded wins
+  const [view, setView] = useState("chat");      // "chat" or "wins" (the strengths review)
+  const [wins, setWins] = useState([]);          // durable strengths, with evidence
 
   // Track sign-in state; runs once on mount.
   useEffect(() => {
@@ -101,17 +101,17 @@ export default function App() {
     };
   }, [user]);
 
-  // Load the wins review (entries that recorded wins, newest first) when the
-  // person opens that tab.
+  // Load the strengths review — a few durable capabilities, not every win
+  // ever recorded — when the person opens that tab.
   useEffect(() => {
     if (!user || view !== "wins") return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await authFetch(`${API}/wins`);
+        const res = await authFetch(`${API}/strengths`);
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setWins(data.wins || []);
+        if (!cancelled) setWins(data.strengths || []);
       } catch {
         /* ignore */
       }
@@ -288,7 +288,7 @@ export default function App() {
           </div>
           <div className="lfeature">
             <span className="licon">☖</span>
-            <h3>See your wins</h3>
+            <h3>See your strengths</h3>
             <p>
               Each day's meaningful wins, captured and reflected back — so your
               growth never slips by unnoticed.
@@ -331,7 +331,7 @@ export default function App() {
             className={view === "wins" ? "on" : ""}
             onClick={() => setView("wins")}
           >
-            🏆 Wins
+            🏆 Strengths
           </button>
         </div>
       </header>
@@ -339,16 +339,21 @@ export default function App() {
       {view === "wins" ? (
         <main className="chat wins-view">
           {wins.length === 0 && (
-            <p className="empty">Your wins will show up here as you talk.</p>
+            <p className="empty">
+              Keep talking — what you're capable of will take shape here.
+            </p>
           )}
-          {groupByDay(wins).map(([day, items]) => (
-            <section key={day} className="winday">
-              <h3>{day}</h3>
-              {items.map((e) => (
-                <div key={e.id} className="md winblock">
-                  <ReactMarkdown>{e.wins}</ReactMarkdown>
-                </div>
-              ))}
+          {wins.length > 0 && (
+            <p className="winlede">What you've proven you can do</p>
+          )}
+          {wins.map((s, i) => (
+            <section key={i} className="strength">
+              <h3>{s.title}</h3>
+              <ul>
+                {(s.evidence || []).map((e, j) => (
+                  <li key={j}>{e}</li>
+                ))}
+              </ul>
             </section>
           ))}
         </main>
@@ -416,15 +421,4 @@ export default function App() {
       )}
     </div>
   );
-}
-
-// Group win-entries by their calendar day (newest first), keeping order.
-function groupByDay(items) {
-  const map = new Map();
-  for (const e of items) {
-    const day = (e.created_at || "").slice(0, 10);
-    if (!map.has(day)) map.set(day, []);
-    map.get(day).push(e);
-  }
-  return [...map.entries()];
 }

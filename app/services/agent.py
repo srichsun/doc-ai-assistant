@@ -16,7 +16,7 @@ from langchain_core.messages import AIMessageChunk
 from pydantic import BaseModel, Field
 
 from app.core import clock, security
-from app.services import chat_model, entries, profile, recall
+from app.services import chat_model, entries, profile, recall, strengths
 
 SYSTEM_PROMPT = """You are this person's personal coach and thinking partner — someone who has known them a long time and genuinely cares how their life is going. If you know their name, use it naturally.
 
@@ -27,6 +27,8 @@ Structure the reply clearly with Markdown so it's easy to read and feels insight
 - Organize the reflection into a few sections, each led by a short **bold insight headline** that captures the MEANING in your coach voice — like "**You stopped preparing and started participating**" or "**Friday night has changed**" — followed by a few sentences of warm, specific prose under it.
 - Use a light header when you move to a different topic (e.g. a decision they asked about).
 - Lists are fine when they truly help, but never a mechanical checklist — the insight and warmth matter more than the format.
+
+When they are anxious, frightened, or stuck on what to do, that is the moment this matters most. Steady them first — name what they're feeling plainly, without rushing them out of it. Then remind them of what they are actually capable of, using the specific evidence below: the times they pulled themselves back, the things they shipped while afraid. Not "you've got this" — the real moment, named. Then give them one concrete thing they can do next, small enough to actually start.
 
 Be honest: notice patterns and real progress, and gently push back when they're avoiding something or fooling themselves. Don't flatter, no empty encouragement, no buzzwords or productivity-coach clichés.
 
@@ -48,13 +50,23 @@ def _with_profile(request) -> str:
     Runs at model-call time; if the profile can't be read we just fall back to
     the base prompt rather than break the conversation.
     """
+    uid = security.current_uid.get()
     try:
-        summary = profile.get_profile(security.current_uid.get())
+        summary = profile.get_profile(uid)
     except Exception:
         summary = ""
-    if not summary:
-        return SYSTEM_PROMPT
-    return f"{SYSTEM_PROMPT}\n\nWhat you already know about this person:\n{summary}"
+    try:
+        proven = strengths.as_prompt_text(uid)
+    except Exception:
+        proven = ""
+
+    prompt = SYSTEM_PROMPT
+    if summary:
+        prompt += f"\n\nWhat you already know about this person:\n{summary}"
+    if proven:
+        # The evidence to reach for when they're frightened or stuck.
+        prompt += f"\n\nWhat this person has proven they can do:\n{proven}"
+    return prompt
 
 
 def build_agent(model, tools=None, middleware=None):
@@ -218,6 +230,10 @@ def _log_exchange(
         pass
     try:
         profile.maybe_refresh(user_id)
+    except Exception:
+        pass
+    try:
+        strengths.maybe_refresh(user_id)
     except Exception:
         pass
 

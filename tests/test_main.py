@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.core import security as auth
-from app.services import entries, voice
+from app.services import entries, strengths, voice
 from app.main import app
 
 client = TestClient(app)
@@ -76,14 +76,23 @@ def test_speak_returns_audio(monkeypatch):
     assert resp.content == b"fake-mp3"
 
 
-def test_wins_endpoint_lists_only_wins(sqlite_db):
-    entries.save_entry("just a normal day", "ok", user_id=TEST_UID, wins=None)
-    entries.save_entry(
-        "shipped the feature", "huge!", user_id=TEST_UID, wins="shipped feature"
+def test_strengths_endpoint_returns_the_saved_strengths(sqlite_db, monkeypatch):
+    monkeypatch.setattr(
+        strengths,
+        "get_strengths",
+        lambda uid: [{"title": "You keep going", "evidence": ["shipped it tired"]}],
     )
 
-    resp = client.get("/wins")
+    resp = client.get("/strengths")
     assert resp.status_code == 200
-    wins = resp.json()["wins"]
-    assert len(wins) == 1
-    assert wins[0]["wins"] == "shipped feature"
+    assert resp.json()["strengths"] == [
+        {"title": "You keep going", "evidence": ["shipped it tired"]}
+    ]
+
+
+def test_strengths_endpoint_is_empty_before_any_have_formed(sqlite_db):
+    entries.save_entry("a normal day", "ok", user_id=TEST_UID, wins=None)
+
+    resp = client.get("/strengths")
+    assert resp.status_code == 200
+    assert resp.json()["strengths"] == []

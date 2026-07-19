@@ -309,38 +309,65 @@
 }
 .google:hover { background: var(--accent-deep); }
 
-/* --- Wins review --- */
-.wins-view { gap: 26px; padding-top: 26px; }
-.winday { max-width: 780px; }
-.winday h3 {
+/* --- Strengths review --- *
+ * Read by someone who is anxious, so: few items, generous space, the
+ * capability large enough to land on its own and the proof quiet beneath it.
+ */
+.wins-view { gap: 18px; padding-top: 30px; }
+
+.winlede {
+  max-width: 780px;
   font-family: -apple-system, "Segoe UI", sans-serif;
-  color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  margin: 0 0 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
 }
-.winblock {
+
+.strength {
+  max-width: 780px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 16px;
   box-shadow: var(--shadow);
-  padding: 20px 24px;
-  margin-bottom: 12px;
-  font-family: "Newsreader", Georgia, serif;
-  font-size: 17px;
-  line-height: 1.7;
+  padding: 26px 30px;
 }
-.winblock strong { color: var(--accent-deep); font-weight: 600; }
-.winblock ul { margin: 0; padding: 0; list-style: none; }
-.winblock li {
-  margin: 0 0 16px;
-  padding-left: 18px;
-  border-left: 2px solid var(--accent-soft);
+.strength h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 500;
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--accent-deep);
+  margin-bottom: 14px;
 }
-.winblock li:last-child { margin-bottom: 0; }
-.winblock p { margin: 0 0 10px; }
+.strength ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.strength li {
+  position: relative;
+  margin: 0 0 10px;
+  padding-left: 20px;
+  font-family: "Newsreader", Georgia, "Noto Serif TC", serif;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.strength li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 11px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.55;
+}
+.strength li:last-child { margin-bottom: 0; }
 
 /* --- Landing page (signed out) --- */
 .landing {
