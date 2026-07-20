@@ -9,7 +9,6 @@ We never touch passwords or the login flow ourselves — Firebase owns all of
 that. The Admin SDK is initialized lazily from the service-account file so
 tests (which pass a uid directly) don't need it.
 """
-import contextvars
 from functools import lru_cache
 
 import firebase_admin
@@ -18,14 +17,6 @@ from firebase_admin import auth as fb_auth
 from firebase_admin import credentials
 
 from app.core import config
-
-# The current request's user id, set once the token is verified so the agent's
-# tools and dynamic prompt can scope to the right person without threading it
-# through every call. Defaults to None for unauthenticated code paths.
-current_uid: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "current_uid", default=None
-)
-
 
 @lru_cache(maxsize=1)
 def _app() -> firebase_admin.App:
@@ -41,11 +32,7 @@ def verify_token(id_token: str) -> str:
 
 
 def current_user(authorization: str | None = Header(None)) -> str:
-    """FastAPI dependency: require a valid Bearer token, return the uid.
-
-    Also stashes the uid in the request-scoped context var so downstream agent
-    code (recall tool, profile injection) can see who's asking.
-    """
+    """FastAPI dependency: require a valid Bearer token, return the uid."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     token = authorization.split(" ", 1)[1]
@@ -53,5 +40,4 @@ def current_user(authorization: str | None = Header(None)) -> str:
         uid = verify_token(token)
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    current_uid.set(uid)
     return uid

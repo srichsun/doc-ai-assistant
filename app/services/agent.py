@@ -15,7 +15,8 @@ from langchain.agents.middleware import dynamic_prompt
 from langchain_core.messages import AIMessageChunk
 from pydantic import BaseModel, Field
 
-from app.core import clock, security
+from app.core import clock
+from app.core.context import CoachContext
 from app.services import chat_model, entries, mantras, profile, recall, strengths
 
 SYSTEM_PROMPT = """You are Minerva — this person's friend and thinking partner, someone who has known them a long time and genuinely cares how their life is going. Say your name only if they ask; you don't announce yourself. If you know their name, use it naturally.
@@ -52,7 +53,7 @@ def _with_profile(request) -> str:
     Runs at model-call time; if the profile can't be read we just fall back to
     the base prompt rather than break the conversation.
     """
-    uid = security.current_uid.get()
+    uid = request.runtime.context.user_id
     try:
         summary = profile.get_profile(uid)
     except Exception:
@@ -100,6 +101,7 @@ def build_agent(model, tools=None, middleware=None):
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
         middleware=middleware,
+        context_schema=CoachContext,
     )
 
 
@@ -145,14 +147,20 @@ def _turn(message: str, user_id: str | None) -> list[dict]:
     return _history(user_id) + [{"role": "user", "content": message}]
 
 
-def run(message: str) -> dict:
+def run(message: str, user_id: str | None = None) -> dict:
     """Send one message to the coach and get its reply.
 
     The coach sees everything said today, so there is nothing else to pass in.
+    user_id rides along as the run's context so the dynamic prompt and the
+    recall tool — both called by LangChain, not by us — know whose journal
+    they are looking at.
 
     Returns {"answer"}.
     """
-    result = _agent.invoke({"messages": _turn(message, security.current_uid.get())})
+    result = _agent.invoke(
+        {"messages": _turn(message, user_id)},
+        context=CoachContext(user_id=user_id),
+    )
     reply = result["messages"][-1].content  # the coach's latest reply text
     return {"answer": reply}
 
@@ -212,10 +220,7 @@ def chat_and_log(message: str, user_id: str | None = None) -> dict:
     separate. If tag extraction fails, we still save the raw exchange with
     empty tags rather than lose it.
     """
-    # Make the signed-in user visible to the agent's tools and profile
-    # injection for the duration of this call.
-    security.current_uid.set(user_id)
-    result = run(message)
+    result = run(message, user_id)
     _log_exchange(message, result["answer"], user_id)
     return result
 
@@ -252,11 +257,11 @@ def _log_exchange(message: str, reply: str, user_id: str | None) -> None:
 def stream_and_log(message: str, user_id: str | None = None):
     """Stream the coach's reply token by token (for a typewriter effect), then
     save the exchange once it's complete. Yields plain text chunks."""
-    security.current_uid.set(user_id)
     parts = []
     for chunk, _meta in _agent.stream(
         {"messages": _turn(message, user_id)},
         stream_mode="messages",
+        context=CoachContext(user_id=user_id),
     ):
         # Only the coach's own text tokens (not tool-call plumbing).
         if isinstance(chunk, AIMessageChunk) and isinstance(chunk.content, str):

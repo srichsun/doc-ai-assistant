@@ -11,11 +11,13 @@ built lazily on first use and mocked in tests (SQLite can't run it).
 """
 from functools import lru_cache
 
+from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 from langchain_openai import OpenAIEmbeddings
 from langchain_postgres import PGVector
 
-from app.core import config, security
+from app.core import config
+from app.core.context import CoachContext
 
 # Kept separate from the SQL `entries` table; PGVector manages its own tables.
 COLLECTION_NAME = "journal_entries"
@@ -67,13 +69,14 @@ def recall(query: str, user_id: str | None = None, k: int = TOP_K) -> list[str]:
 
 
 @tool
-def search_past_entries(query: str) -> str:
+def search_past_entries(query: str, runtime: ToolRuntime[CoachContext]) -> str:
     """Search the person's past journal entries for moments related to what
     they are talking about now. Use this to ground your reply in their real
     history — what they said before, recurring patterns, or similar feelings —
     instead of guessing. The query should describe the current topic or feeling."""
-    # Scope to whoever is signed in for this request.
-    hits = recall(query, user_id=security.current_uid.get())
+    # `runtime` is injected by LangChain, not chosen by the model — it never
+    # appears in the tool schema the model sees.
+    hits = recall(query, user_id=runtime.context.user_id)
     if not hits:
         return "No related past entries found."
     return "\n\n".join(f"- {h}" for h in hits)

@@ -6,7 +6,7 @@ tokens and need no API key.
 from langchain_core.language_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
-from app.core import clock, security
+from app.core import clock
 from app.services import agent, entries
 
 
@@ -40,14 +40,12 @@ def test_coach_replays_todays_conversation(sqlite_db, monkeypatch):
         type(
             "Spy",
             (),
-            {"invoke": lambda self, state: seen.update(state) or {
+            {"invoke": lambda self, state, **kw: seen.update(state) or {
                 "messages": [AIMessage("ok")]
             }},
         )(),
     )
-    security.current_uid.set("u1")
-
-    agent.run("and then?")
+    agent.run("and then?", user_id="u1")
 
     assert seen["messages"] == [
         {"role": "user", "content": "I was nervous"},
