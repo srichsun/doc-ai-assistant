@@ -138,6 +138,9 @@ export default function App() {
   // Speech already fetched this session, so replaying is instant and free.
   const audioCache = useRef(new Map());
   const abortRef = useRef(null); // lets a second tap cancel a request in flight
+  // Which reply is currently claimed for playback. A ref rather than state
+  // because taps arrive faster than React re-renders.
+  const activeRef = useRef(null);
 
   // Auto-scroll to the newest message whenever the list changes.
   const bottom = useRef(null);
@@ -196,26 +199,20 @@ export default function App() {
 
   // Read one reply aloud — called from a tap on its speaker button.
   //
-  // Speech takes a few seconds to come back, which used to look broken: no
-  // feedback, so people tapped again and again and got overlapping audio. Now
-  // the button says what it's doing, a second tap always means stop (even
-  // mid-request), and each reply is only ever fetched once.
+  // The "which reply is active" flag lives in a ref, not state, and that is the
+  // whole point: two quick taps land in the same render, so a state check would
+  // still read null on the second one and fire a second request. Both would
+  // then play, on top of each other. A ref updates the instant we set it.
   async function playReply(text, idx) {
     const a = audioRef.current || (audioRef.current = new Audio());
 
     // Tapping the same reply again — loading or playing — means stop.
-    if (speakingIdx === idx || loadingIdx === idx) {
-      abortRef.current?.abort();
-      a.pause();
-      setSpeakingIdx(null);
-      setLoadingIdx(null);
+    if (activeRef.current === idx) {
+      stopSpeech();
       return;
     }
-
-    // Switching to a different reply: abandon whatever was in flight.
-    abortRef.current?.abort();
-    a.pause();
-    setSpeakingIdx(null);
+    stopSpeech(); // switching replies: abandon whatever was going
+    activeRef.current = idx; // claimed synchronously, before any await
 
     // Unlock playback NOW, synchronously inside the tap — browsers block a
     // play() called later (after the await), which is why sound was missing.
@@ -244,22 +241,42 @@ export default function App() {
         body: JSON.stringify({ text }),
         signal: controller.signal,
       });
-      setLoadingIdx(null);
-      if (!res.ok) return; // speech failed; the text is still there
+      if (!res.ok) throw new Error("speech failed");
       const url = URL.createObjectURL(await res.blob());
       audioCache.current.set(text, url);
+      // Stopped, or another reply claimed playback, while we were waiting.
+      if (activeRef.current !== idx) return;
+      setLoadingIdx(null);
       startPlaying(a, url, idx);
     } catch {
-      setLoadingIdx(null); // aborted by another tap, or the request failed
+      if (activeRef.current === idx) stopSpeech(); // aborted, or it failed
     }
   }
 
   function startPlaying(a, url, idx) {
     a.pause();
     a.src = url;
-    a.onended = () => setSpeakingIdx(null);
+    a.onended = () => {
+      if (activeRef.current === idx) stopSpeech();
+    };
+    setLoadingIdx(null);
     setSpeakingIdx(idx);
-    a.play().catch(() => setSpeakingIdx(null));
+    a.play().catch(() => stopSpeech());
+  }
+
+  // One place that undoes everything, so no path can leave a request running
+  // or a flag set.
+  function stopSpeech() {
+    activeRef.current = null;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    const a = audioRef.current;
+    if (a) {
+      a.onended = null;
+      a.pause();
+    }
+    setSpeakingIdx(null);
+    setLoadingIdx(null);
   }
 
   // Stream the coach's reply to a question into a new assistant bubble, typing
