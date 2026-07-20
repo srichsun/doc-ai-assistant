@@ -10,12 +10,10 @@ from pydantic import BaseModel
 
 class TalkRequest(BaseModel):
     question: str
-    session_id: str | None = None  # pass the same id to continue a conversation
 
 
 class TalkResponse(BaseModel):
     answer: str
-    session_id: str | None = None
 
 
 class SpeakRequest(BaseModel):

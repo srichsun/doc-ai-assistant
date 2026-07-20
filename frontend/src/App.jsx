@@ -120,16 +120,6 @@ const SILENT =
 // back to the separate dev server.
 const API = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
-// One random id per browser, saved so it survives page reloads.
-function getSessionId() {
-  let id = localStorage.getItem("session_id");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("session_id", id);
-  }
-  return id;
-}
-
 // fetch() with the signed-in user's ID token attached, so the backend knows
 // who's asking and can scope the journal to them.
 async function authFetch(url, options = {}) {
@@ -372,7 +362,7 @@ export default function App() {
       const res = await authFetch(`${API}/agent/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, session_id: getSessionId() }),
+        body: JSON.stringify({ question }),
       });
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

@@ -25,12 +25,13 @@ def _coach_with(replies):
 def test_coach_replies(monkeypatch):
     monkeypatch.setattr(agent, "_agent", _coach_with(["you've got this"]))
     result = agent.run("I feel down today")
-    assert result == {"answer": "you've got this", "session_id": None}
+    assert result == {"answer": "you've got this"}
 
 
 def test_coach_replays_todays_conversation(sqlite_db, monkeypatch):
-    """Memory comes from the journal, not from the caller's session id — which
-    is what lets a conversation continue on another device or after a restart."""
+    """Memory comes from the journal, not from anything the caller passes in —
+    which is what lets a conversation continue on another device or after a
+    restart."""
     entries.save_entry("I was nervous", "tell me more", user_id="u1")
     seen = {}
     monkeypatch.setattr(
@@ -46,7 +47,7 @@ def test_coach_replays_todays_conversation(sqlite_db, monkeypatch):
     )
     security.current_uid.set("u1")
 
-    agent.run("and then?", session_id="a-different-device")
+    agent.run("and then?")
 
     assert seen["messages"] == [
         {"role": "user", "content": "I was nervous"},
@@ -94,7 +95,7 @@ def test_chat_and_log_saves_a_journal_entry(sqlite_db, monkeypatch):
         lambda eid, text, user_id=None: indexed.append((eid, text, user_id)),
     )
 
-    result = agent.chat_and_log("I ran 5k today", user_id="u1", session_id="s-log")
+    result = agent.chat_and_log("I ran 5k today", user_id="u1")
     assert result["answer"] == "proud of you"
 
     # The exchange should now be in the database, owned by u1.

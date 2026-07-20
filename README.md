@@ -47,9 +47,9 @@ devices. Each turn now rebuilds today's conversation by replaying it from the
 database. Deleting a component proved more about the design than adding a
 framework would have.
 
-**A "conversation" is defined as uid + day, not a browser session.** A
-`session_id` lives in localStorage, so switching devices silently starts a new
-conversation. Days are drawn in **Taiwan time** (`app/core/clock.py`) — a UTC
+**A "conversation" is defined as uid + day, not a browser session.** Nothing
+identifies the browser, so the same conversation continues on any device the
+person signs in from. Days are drawn in **Taiwan time** (`app/core/clock.py`) — a UTC
 day boundary would cut the thread at 8am local, halfway through a morning.
 
 ## How a conversation flows
@@ -191,7 +191,7 @@ Open http://127.0.0.1:8000/docs for the interactive Swagger UI.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET  | `/health`            | — | Liveness check; no key needed. |
-| POST | `/agent`             | ✅ | Typed chat. `{"question", "session_id?"}` → reply; the exchange is saved as a journal entry. |
+| POST | `/agent`             | ✅ | Typed chat. `{"question"}` → reply; the exchange is saved as a journal entry. |
 | POST | `/agent/stream`      | ✅ | Same as `/agent`, but streams the reply token by token. |
 | POST | `/transcribe`        | ✅ | Upload recorded audio → text. |
 | POST | `/speak`             | ✅ | Text → spoken audio (mp3) for the browser to play. |

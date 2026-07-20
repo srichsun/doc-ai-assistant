@@ -145,17 +145,16 @@ def _turn(message: str, user_id: str | None) -> list[dict]:
     return _history(user_id) + [{"role": "user", "content": message}]
 
 
-def run(message: str, session_id: str | None = None) -> dict:
+def run(message: str) -> dict:
     """Send one message to the coach and get its reply.
 
-    The coach sees everything said today; session_id is only echoed back for
-    the caller's bookkeeping.
+    The coach sees everything said today, so there is nothing else to pass in.
 
-    Returns {"answer", "session_id"}.
+    Returns {"answer"}.
     """
     result = _agent.invoke({"messages": _turn(message, security.current_uid.get())})
     reply = result["messages"][-1].content  # the coach's latest reply text
-    return {"answer": reply, "session_id": session_id}
+    return {"answer": reply}
 
 
 class EntryTags(BaseModel):
@@ -205,9 +204,7 @@ def extract_tags(transcript: str, reply: str) -> EntryTags:
     return _extractor.invoke(prompt)
 
 
-def chat_and_log(
-    message: str, user_id: str | None = None, session_id: str | None = None
-) -> dict:
+def chat_and_log(message: str, user_id: str | None = None) -> dict:
     """Reply as the coach, then save the exchange as a journal entry.
 
     Every turn is saved on purpose — that's the whole point (unlike ChatGPT,
@@ -218,14 +215,12 @@ def chat_and_log(
     # Make the signed-in user visible to the agent's tools and profile
     # injection for the duration of this call.
     security.current_uid.set(user_id)
-    result = run(message, session_id)
-    _log_exchange(message, result["answer"], user_id, session_id)
+    result = run(message)
+    _log_exchange(message, result["answer"], user_id)
     return result
 
 
-def _log_exchange(
-    message: str, reply: str, user_id: str | None, session_id: str | None
-) -> None:
+def _log_exchange(message: str, reply: str, user_id: str | None) -> None:
     """Save one exchange as a journal entry, then embed it and (occasionally)
     refresh the profile. Failures in the extras never lose the saved entry."""
     try:
@@ -236,7 +231,6 @@ def _log_exchange(
         transcript=message,
         ai_reply=reply,
         user_id=user_id,
-        session_id=session_id,
         mood=tags.mood,
         wins=tags.wins,
         themes=tags.themes,
@@ -255,9 +249,7 @@ def _log_exchange(
         pass
 
 
-def stream_and_log(
-    message: str, user_id: str | None = None, session_id: str | None = None
-):
+def stream_and_log(message: str, user_id: str | None = None):
     """Stream the coach's reply token by token (for a typewriter effect), then
     save the exchange once it's complete. Yields plain text chunks."""
     security.current_uid.set(user_id)
@@ -271,4 +263,4 @@ def stream_and_log(
             if chunk.content:
                 parts.append(chunk.content)
                 yield chunk.content
-    _log_exchange(message, "".join(parts), user_id, session_id)
+    _log_exchange(message, "".join(parts), user_id)
