@@ -3,460 +3,243 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Minerva — a voice AI friend who remembers</title>
-<meta name="description" content="A voice AI friend with three layers of memory: the journal grows forever, the prompt stays a fixed size. Built on FastAPI, LangChain, Postgres + pgvector.">
+<title>Minerva</title>
+<meta name="description" content="A voice AI friend with three layers of memory — she listens, remembers, and gets to know you over time. Built on FastAPI, LangChain, and OpenAI.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+TC:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* ------------------------------------------------------------------ *
- * Minerva — showcase. Same warm-paper identity as the app itself:
- * the page should look like it was made by the product, not about it.
- * Single light theme on purpose — the app commits to one too.
- * ------------------------------------------------------------------ */
-:root{
-  --paper:#f4efe7;        /* warm paper ground */
-  --surface:#fffdf9;      /* raised panels */
-  --surface-2:#ece5d8;    /* subtle fills */
-  --line:#e4dccd;         /* hairline */
-  --line-strong:#d3c7b0;
-  --ink:#2c2822;          /* warm ink */
-  --muted:#8b8174;        /* warm secondary, biased toward the gold */
-  --gold:#9a7b4f;         /* antique gold */
-  --gold-deep:#7d6238;
-  --gold-soft:rgba(154,123,79,.09);
-
-  --serif:"Newsreader",Georgia,"Noto Serif TC",serif;
-  --display:"Fraunces",Georgia,"Noto Serif TC",serif;
-  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-
-  color-scheme:light;
-}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{
-  margin:0;background:var(--paper);color:var(--ink);
-  font-family:var(--serif);font-size:17px;line-height:1.7;
-  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
-}
-a{color:inherit}
-:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:2px}
-@media (prefers-reduced-motion:reduce){
-  html{scroll-behavior:auto}
-  *{transition:none!important;animation:none!important}
-}
-
-/* --- shared rhythm ------------------------------------------------ */
-.wrap{max-width:1000px;margin:0 auto;padding:0 28px}
-.eyebrow{
-  font-family:var(--mono);font-size:11.5px;font-weight:500;
-  letter-spacing:.14em;text-transform:uppercase;color:var(--gold);
-}
-.lede{font-size:19px;color:var(--muted);max-width:60ch;margin:0}
-.prose{max-width:64ch}
-.prose p{margin:0 0 18px}
-.prose p:last-child{margin-bottom:0}
-
-h1,h2,h3{font-family:var(--display);font-weight:500;text-wrap:balance;margin:0}
-h1{font-size:clamp(40px,6.4vw,66px);line-height:1.06;letter-spacing:-.025em;font-weight:400}
-h2{font-size:clamp(27px,3.4vw,34px);line-height:1.2;letter-spacing:-.015em}
-h3{font-size:18.5px;line-height:1.35}
-em.hl{font-style:italic;color:var(--gold-deep)}
-
-/* --- top bar ------------------------------------------------------ */
-.topbar{
-  position:sticky;top:0;z-index:20;
-  background:rgba(244,239,231,.86);backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--line);
-}
-.topbar .row{display:flex;align-items:center;gap:24px;height:62px}
-.mark{font-family:var(--display);font-size:20px;font-weight:500;letter-spacing:.01em;text-decoration:none}
-.mark::after{content:"";display:inline-block;width:5px;height:5px;margin-left:7px;
-  border-radius:50%;background:var(--gold);vertical-align:middle}
-.navlinks{display:flex;gap:22px;margin-left:auto;font-size:14.5px;color:var(--muted)}
-.navlinks a{text-decoration:none;padding-bottom:2px;border-bottom:1px solid transparent;transition:color .2s,border-color .2s}
-.navlinks a:hover{color:var(--ink);border-bottom-color:var(--gold)}
-@media(max-width:860px){.navlinks{display:none}}
-
-.btn{
-  font-family:var(--serif);font-size:14.5px;text-decoration:none;cursor:pointer;
-  border:1px solid var(--line-strong);background:transparent;color:var(--ink);
-  padding:8px 16px;border-radius:999px;transition:border-color .2s,background .2s,color .2s;
-  white-space:nowrap;
-}
-.btn:hover{border-color:var(--gold);background:var(--gold-soft)}
-.btn.solid{background:var(--gold);border-color:var(--gold);color:#fffdf9}
-.btn.solid:hover{background:var(--gold-deep);border-color:var(--gold-deep)}
-.topbar .btn{margin-left:0}
-.langbtn{font-family:var(--mono);font-size:12px;letter-spacing:.04em}
-
-/* --- hero --------------------------------------------------------- */
-.hero{padding:104px 0 76px}
-.hero .eyebrow{display:block;margin-bottom:22px}
-.hero h1{max-width:15ch}
-.hero .lede{margin-top:26px;font-size:20px}
-.hero .cta{display:flex;gap:12px;margin-top:38px;flex-wrap:wrap}
-
-/* The standing numbers, set as a ruled strip rather than a row of cards. */
-.facts{
-  display:flex;flex-wrap:wrap;gap:0 44px;margin-top:60px;
-  border-top:1px solid var(--line);padding-top:18px;
-}
-.fact{padding:6px 0}
-.fact b{
-  display:block;font-family:var(--display);font-size:27px;font-weight:500;
-  color:var(--gold-deep);font-variant-numeric:tabular-nums;line-height:1.2;
-}
-.fact span{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--muted)}
-
-/* --- sections ----------------------------------------------------- */
-.band{padding:78px 0;border-top:1px solid var(--line)}
-.band.tint{background:linear-gradient(180deg,rgba(236,229,216,.5),rgba(236,229,216,0))}
-.band-head{margin-bottom:44px}
-.band-head .eyebrow{display:block;margin-bottom:12px}
-.band-head .lede{margin-top:16px;font-size:17.5px}
-
-/* The spread: a live margin beside the reading column. This is the page's
-   one structural idea — notes, file paths and numbers sit in the margin,
-   the way they would in an annotated notebook. */
-.spread{display:grid;grid-template-columns:152px minmax(0,1fr);gap:0 44px}
-.spread + .spread{margin-top:40px;padding-top:40px;border-top:1px solid var(--line)}
-.note{
-  font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--muted);
-  letter-spacing:.02em;padding-top:5px;
-}
-.note .big{
-  display:block;font-family:var(--display);font-size:23px;font-weight:500;
-  letter-spacing:-.01em;color:var(--gold-deep);margin-bottom:6px;
-  font-variant-numeric:tabular-nums;
-}
-.note .file{display:block;word-break:break-all;color:var(--muted);opacity:.85;margin-top:6px}
-@media(max-width:760px){
-  .spread{grid-template-columns:1fr;gap:12px}
-  .note{padding-top:0;order:-1}
-  .note .big{font-size:20px;margin-bottom:2px}
-}
-
-/* Layered list — used where the content really is a stack, so the
-   numbering carries meaning rather than decoration. */
-.layers{list-style:none;padding:0;margin:0;counter-reset:layer}
-.layers li{
-  counter-increment:layer;display:grid;grid-template-columns:52px minmax(0,1fr);
-  gap:0 26px;padding:24px 0;border-top:1px solid var(--line);
-}
-.layers li:last-child{border-bottom:1px solid var(--line)}
-.layers li::before{
-  content:counter(layer);font-family:var(--display);font-size:30px;font-weight:400;
-  color:var(--gold);opacity:.55;line-height:1;padding-top:4px;
-}
-.layers h3{margin-bottom:5px}
-.layers .where{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--muted);display:block;margin-bottom:9px}
-.layers p{margin:0;color:var(--muted);font-size:16px}
-
-/* Plain ruled list, no cards. */
-.ruled{list-style:none;padding:0;margin:0}
-.ruled li{padding:18px 0;border-top:1px solid var(--line);color:var(--muted);font-size:16.5px}
-.ruled li:last-child{border-bottom:1px solid var(--line)}
-.ruled b{color:var(--ink);font-weight:500}
-
-pre{
-  font-family:var(--mono);font-size:12.5px;line-height:1.75;color:#4a4237;
-  background:var(--surface);border:1px solid var(--line);border-radius:4px;
-  padding:22px;overflow-x:auto;margin:0;
-}
-.equation{
-  font-family:var(--mono);font-size:13.5px;line-height:2;color:var(--gold-deep);
-  border-left:2px solid var(--gold);padding:4px 0 4px 20px;margin:0;
-  overflow-x:auto;
-}
-
-/* --- architecture diagram ----------------------------------------- */
-.archwrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:34px;align-items:start}
-@media(max-width:860px){.archwrap{grid-template-columns:1fr}}
-.diagram{display:flex;flex-direction:column;align-items:center;gap:5px}
-.lane{
-  font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--muted);align-self:flex-start;margin:4px 0 8px;
-}
-.node{
-  appearance:none;font-family:var(--serif);text-align:center;cursor:pointer;color:var(--ink);
-  background:var(--surface);border:1px solid var(--line);border-radius:5px;
-  padding:10px 16px;min-width:214px;display:flex;flex-direction:column;gap:1px;
-  transition:border-color .2s,box-shadow .2s,background .2s;
-}
-.node b{font-size:14.5px;font-weight:500}
-.node small{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.01em}
-.node:hover{border-color:var(--gold)}
-.node.active{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft);background:#fff}
-.node.hot{border-color:var(--line-strong)}
-.node.done{background:var(--surface-2)}
-.node.ghost{cursor:default;border-style:dashed;background:transparent}
-.node.inner{min-width:190px;font-size:13px}
-.v{color:var(--line-strong);font-size:14px;line-height:1.1}
-.v span{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.06em}
-.loopbox{
-  border:1px dashed var(--line-strong);border-radius:6px;padding:16px 18px 13px;
-  display:flex;flex-direction:column;align-items:center;gap:5px;margin:5px 0;
-  background:rgba(255,253,249,.5);
-}
-.looplabel,.loopback{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted)}
-.loopback{margin-top:9px}
-.row2{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
-.row3{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
-.toolbox{display:flex;flex-direction:column;align-items:center;gap:5px}
-.connector{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.04em}
-.arr{color:var(--line-strong)}
-.detail{
-  position:sticky;top:82px;background:var(--surface);border:1px solid var(--line);
-  border-radius:5px;padding:22px;
-}
-.detail .dt-file{font-family:var(--mono);font-size:11px;color:var(--gold);
-  letter-spacing:.03em;word-break:break-all}
-.detail h3{margin:9px 0 8px;font-size:17px}
-.detail p{margin:0;color:var(--muted);font-size:15px;line-height:1.65}
-
-/* --- stack -------------------------------------------------------- */
-.chips{display:flex;flex-wrap:wrap;gap:9px}
-.chip{
-  border:1px solid var(--line);background:var(--surface);border-radius:999px;
-  padding:7px 15px;font-size:14.5px;
-}
-.chip b{font-weight:500;color:var(--gold-deep)}
-.chip span{color:var(--muted);font-size:13px}
-
-footer{padding:56px 0 72px;border-top:1px solid var(--line);color:var(--muted);font-size:14.5px}
-footer a{color:var(--gold-deep)}
+  :root{
+    --bg:#0b0e14; --panel:#11151f; --line:#1e2532; --text:#e6e9ef;
+    --muted:#8a93a6; --accent:#5eead4; --accent2:#818cf8; --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif;
+    line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px}
+  /* nav */
+  nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(10px);
+    background:rgba(11,14,20,.8);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;gap:20px;height:60px}
+  .brand{font-weight:700;letter-spacing:.02em}
+  .brand span{color:var(--accent)}
+  .nav .links{display:flex;gap:18px;margin-left:auto;font-size:14px;color:var(--muted)}
+  .nav .links a:hover{color:var(--text)}
+  .btn{border:1px solid var(--line);padding:7px 14px;border-radius:8px;font-size:13px;color:var(--text)}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#04211c;border-color:var(--accent);font-weight:600}
+  .langtoggle{cursor:pointer;font-size:13px;color:var(--muted);border:1px solid var(--line);
+    padding:6px 10px;border-radius:8px}
+  .langtoggle:hover{color:var(--text)}
+  @media(max-width:760px){.nav .links{display:none}}
+  /* hero */
+  header{padding:96px 0 64px;border-bottom:1px solid var(--line)}
+  .kicker{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+  h1{font-size:clamp(34px,6vw,56px);line-height:1.1;margin:16px 0 20px;letter-spacing:-.02em}
+  h1 em{font-style:normal;color:var(--accent)}
+  .lede{font-size:19px;color:var(--muted);max-width:640px}
+  .cta{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+  .metrics{display:flex;gap:14px;margin-top:44px;flex-wrap:wrap}
+  .metric{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px 18px;min-width:150px}
+  .metric b{display:block;font-size:22px;color:var(--accent)}
+  .metric span{font-size:13px;color:var(--muted)}
+  /* sections */
+  section{padding:64px 0;border-bottom:1px solid var(--line)}
+  .sec-h{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+  h2{font-size:28px;margin:0 0 14px;letter-spacing:-.01em}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:28px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:22px}
+  .card .n{font-family:var(--mono);color:var(--accent2);font-size:13px}
+  .card h3{margin:8px 0 8px;font-size:18px}
+  .card p{margin:0;color:var(--muted);font-size:15px}
+  code,pre{font-family:var(--mono)}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
+    overflow-x:auto;font-size:13px;color:#cdd3df;line-height:1.6}
+  .flow{color:var(--muted);font-size:13.5px}
+  .stack{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+  .chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 14px;font-size:14px}
+  .chip b{color:var(--accent)}
+  ul.clean{list-style:none;padding:0;margin:20px 0 0}
+  ul.clean li{padding:12px 0;border-top:1px solid var(--line);color:var(--muted)}
+  ul.clean li b{color:var(--text)}
+  footer{padding:40px 0 64px;color:var(--muted);font-size:14px}
+  /* architecture diagram */
+  .archwrap{display:grid;grid-template-columns:1fr 290px;gap:26px;margin-top:28px}
+  @media(max-width:760px){.archwrap{grid-template-columns:1fr}}
+  .diagram{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .lane-h{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);align-self:flex-start;margin:6px 0}
+  .node{appearance:none;font-family:inherit;text-align:center;cursor:pointer;color:var(--text);
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 16px;
+    min-width:220px;display:flex;flex-direction:column;gap:2px;
+    transition:border-color .2s,box-shadow .2s,transform .1s}
+  .node b{font-size:15px}
+  .node small{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .node:hover{border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 22px rgba(94,234,212,.22);transform:translateY(-1px)}
+  .node.hot small{color:var(--accent2)}
+  .node.done{border-color:rgba(94,234,212,.5)}
+  .node.ghost{min-width:0;padding:8px 12px;background:transparent;cursor:default}
+  .node.ghost b{font-size:13px;font-weight:600}
+  .v{color:var(--muted);font-size:13px;font-family:var(--mono)}
+  .arr{color:var(--muted)}
+  .row3{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .row2{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .branch{display:flex;flex-direction:column;align-items:center;gap:6px}
+  /* nested "shell wraps internals" box: a tool's outer interface containing
+     what it actually does inside — one box inside another, not two peers */
+  .toolbox{width:236px;border:1.5px solid var(--line);border-radius:16px;
+    padding:12px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:2px;
+    background:rgba(255,255,255,.014)}
+  .toolbox .outer{width:100%;border:none;background:transparent;padding:2px 4px 6px;text-align:center}
+  .toolbox .outer b{font-size:14.5px}
+  .toolbox .connector{display:flex;align-items:center;gap:5px;font-family:var(--mono);
+    font-size:10.5px;color:var(--muted);margin:1px 0 3px}
+  .toolbox .inner{width:90%;padding:9px 12px;background:var(--bg)}
+  .loopbox{border:1px dashed var(--line);border-radius:16px;padding:16px 16px 12px;margin:4px 0;width:100%;
+    max-width:560px;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .looplabel{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;color:var(--accent2)}
+  .loopback{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:8px}
+  .detail{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:20px;
+    align-self:start;position:sticky;top:76px}
+  .detail .dt-file{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:8px;word-break:break-all}
+  .detail h3{margin:0 0 8px;font-size:17px}
+  .detail p{margin:0;color:var(--muted);font-size:14.5px}
+  .hide{display:none!important}
 </style>
 </head>
 <body>
-
-<div class="topbar"><div class="wrap"><div class="row">
-  <a class="mark" href="#top">Minerva</a>
-  <nav class="navlinks">
+<nav><div class="wrap nav">
+  <div class="brand">Minerva</div>
+  <div class="links">
+    <a href="#overview" data-en="Overview" data-zh="總覽"></a>
     <a href="#memory" data-en="Memory" data-zh="記憶"></a>
-    <a href="#engineering" data-en="Engineering" data-zh="工程"></a>
     <a href="#architecture" data-en="Architecture" data-zh="架構"></a>
     <a href="#stack" data-en="Stack" data-zh="技術"></a>
-  </nav>
-  <button class="btn langbtn" id="langBtn" type="button">中文</button>
-  <a class="btn" href="https://github.com/srichsun/Minerva" target="_blank" rel="noopener">GitHub</a>
-</div></div></div>
+  </div>
+  <span class="langtoggle" id="langBtn">中文</span>
+  <a class="btn" id="ghBtn" href="https://github.com/srichsun/Minerva" target="_blank" rel="noopener">GitHub</a>
+</div></nav>
 
-<header class="hero" id="top"><div class="wrap">
-  <span class="eyebrow" data-en="Voice · Memory · Agent" data-zh="語音 · 記憶 · Agent"></span>
-  <h1 data-en="A friend for the <em class='hl'>hard days.</em>" data-zh="難熬的時候，<em class='hl'>有人在。</em>"></h1>
-  <p class="lede" data-en="You talk; she listens. Minerva is built for the moments that actually derail a day — when fear takes over, when nothing feels clear enough to decide, when you've lost sight of what you're capable of." data-zh="你講，她聽。Minerva 是為那些真的會毀掉一天的時刻做的 —— 恐懼上來的時候、混沌到無法決定的時候、忘記自己有多少能耐的時候。"></p>
+<header><div class="wrap">
+  <div class="kicker" data-en="Voice · Memory · Agent" data-zh="語音 · 記憶 · Agent"></div>
+  <h1 data-en="A friend for the<br><em>hard days.</em>" data-zh="難熬的時候，<br><em>有人在。</em>"></h1>
+  <p class="lede" data-en="A voice AI friend for the moments that derail a day — when fear takes over, when nothing feels clear enough to decide, when you've forgotten what you're capable of. She steadies you, helps you think it through, and remembers everything you've already come through." data-zh="一個陪你度過難熬時刻的語音 AI 朋友 —— 恐懼上來的時候、混沌到無法做決定的時候、忘記自己有多少能耐的時候。她穩住你、陪你把事情想清楚，並且記得你已經走過的每一段。"></p>
   <div class="cta">
-    <a class="btn solid" href="https://daily-coach-592904365774.asia-east1.run.app/" target="_blank" rel="noopener" data-en="Try it live" data-zh="線上試用"></a>
-    <a class="btn" href="https://github.com/srichsun/Minerva" target="_blank" rel="noopener" data-en="Read the source" data-zh="看原始碼"></a>
+    <a class="btn primary" href="https://daily-coach-592904365774.asia-east1.run.app/" target="_blank" rel="noopener" data-en="Try it live" data-zh="線上試用"></a>
+    <a class="btn" href="https://github.com/srichsun/Minerva" target="_blank" rel="noopener" data-en="View source" data-zh="看原始碼"></a>
     <a class="btn" href="#memory" data-en="How the memory works" data-zh="記憶怎麼運作"></a>
   </div>
-  <div class="facts">
-    <div class="fact"><b>3</b><span data-en="layers of memory" data-zh="層記憶"></span></div>
-    <div class="fact"><b>14</b><span data-en="API endpoints" data-zh="API endpoint"></span></div>
-    <div class="fact"><b>49</b><span data-en="tests, run offline" data-zh="個測試，離線跑"></span></div>
-    <div class="fact"><b>0</b><span data-en="keys in the repo" data-zh="把 key 進 repo"></span></div>
+  <div class="metrics">
+    <div class="metric"><b>3</b><span data-en="layers of memory" data-zh="層記憶"></span></div>
+    <div class="metric"><b>15</b><span data-en="API endpoints" data-zh="API endpoint"></span></div>
+    <div class="metric"><b>0</b><span data-en="keys in the repo" data-zh="key 進 repo"></span></div>
   </div>
 </div></header>
 
-<!-- ---------------------------------------------------------------- -->
-<section class="band tint" id="what"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="What it is" data-zh="它是什麼"></span>
-    <h2 data-en="Someone you talk to, who gets to know you" data-zh="一個你用講的、而且會越來越懂你的朋友"></h2>
-    <p class="lede" data-en="Speak about your day. She transcribes it, reflects it back, answers out loud — then saves the exchange, so tomorrow she remembers." data-zh="用講的聊你的一天。她轉成文字、反映回來、用聲音回答 —— 然後把這次對話存下來，明天就記得。"></p>
-  </div>
-  <ul class="ruled">
-    <li data-en="<b>Talk, don't type.</b> Tap the mic and speak. OpenAI transcribes you, Minerva replies, and Google Cloud TTS reads the answer back in a real British voice." data-zh="<b>用講的，不用打字。</b>點麥克風開口說。OpenAI 幫你轉錄，Minerva 回覆，Google Cloud TTS 再用真正的英國腔把答案唸回來。"></li>
-    <li data-en="<b>Nothing is forgotten.</b> Every exchange is saved as a journal entry. Close the tab, switch devices, come back next month — the thread is still there." data-zh="<b>什麼都不會忘。</b>每次對話都存成一筆日誌。關掉分頁、換裝置、下個月再回來 —— 那條線還在。"></li>
-    <li data-en="<b>She gets to know you.</b> A rolling, LLM-condensed profile — your goals, habits, triggers, what actually helps — goes into every reply." data-zh="<b>她會越來越懂你。</b>一份滾動、由 LLM 濃縮的 profile（目標、習慣、地雷、什麼真的有用）進到每次回覆裡。"></li>
-    <li data-en="<b>Wins, You, and Mantra.</b> Wins collects what you actually did, day by day. You is a passage about who you are, written from that whole record. Mantra holds the lines you keep — and she gives them back in your own words." data-zh="<b>Wins、You、Mantra。</b>Wins 累積你每天真的做了什麼。You 是從那整份紀錄寫出來的一段「你是怎樣的人」。Mantra 收著你留下的句子 —— 她會用你自己的話回敬你。"></li>
-  </ul>
-</div></section>
-
-<!-- ---------------------------------------------------------------- -->
-<section class="band" id="memory"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="The core idea" data-zh="核心概念"></span>
-    <h2 data-en="The journal grows forever. The prompt doesn't." data-zh="日誌無限長，prompt 不會。"></h2>
-    <p class="lede" data-en="A general chatbot forgets you when the tab closes. Feeding it your whole history every turn is expensive and eventually overflows the context window. Memory is split into three layers, each answering a different question." data-zh="一般聊天機器人在你關掉分頁時就忘了你。每一輪都塞整段歷史又貴、最後還會撐爆 context。這裡把記憶拆成三層，每層回答不同的問題。"></p>
-  </div>
-
-  <ul class="layers">
-    <li>
-      <div>
-        <span class="where">Postgres · plain SQL</span>
-        <h3 data-en="Structured log" data-zh="結構化日誌"></h3>
-        <p data-en="Every exchange saved as a journal entry — transcript, reply, mood, wins, themes. Powers &quot;recall this day&quot; and &quot;this month's wins&quot; with a filtered query. No AI involved." data-zh="每次對話存成一筆日誌 —— 逐字稿、回覆、心情、成就、主題。用一句過濾查詢就能做「回顧這天」「這個月的成就」。完全不用 AI。"></p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <span class="where">pgvector · top-k = 4</span>
-        <h3 data-en="Semantic recall" data-zh="語意回想"></h3>
-        <p data-en="Each entry is embedded. Mid-conversation she can pull back the moments most related to what you're talking about now. Top-k is fixed at four, so the recalled slice is the same size on day one and year three." data-zh="每筆紀錄都被 embed。講到一半她可以拉回跟你現在說的最相關的片刻。top-k 固定四筆，所以第一天跟第三年，拉回來的那一片一樣大。"></p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <span class="where" data-en="LLM-condensed · ~1,000 words" data-zh="LLM 濃縮 · 約 1,000 字"></span>
-        <h3 data-en="Rolling profile" data-zh="滾動 profile"></h3>
-        <p data-en="Every few entries an LLM folds the recent journal into a short profile — keeping what's still true, dropping one-off trivia. It's re-condensed once every five entries, not every turn, so the cost is amortised." data-zh="每幾筆紀錄，LLM 就把最近的日誌摺進一份簡短 profile —— 留下還成立的、丟掉一次性瑣事。每五筆才重算一次，不是每輪，所以成本是攤銷的。"></p>
-      </div>
-    </li>
-  </ul>
-
-  <div class="spread" style="margin-top:44px">
-    <div class="note">
-      <span class="big" data-en="Constant" data-zh="固定"></span>
-      <span data-en="cost per turn, whether you've used her for a day or a year" data-zh="每輪成本固定，不管你用一天還是一年"></span>
-    </div>
-    <div>
-      <p class="equation" data-en="every prompt  =  profile      (layer 3, ~1,000 words, capped)
-                +  recalled    (layer 2, top-k = 4, fixed)
-                +  today       (layer 1, 120k chars max)
-
-the database grows without limit  ·  the prompt does not" data-zh="每次 prompt  =  profile   （第 3 層，約 1,000 字，有上限）
-              +  回想     （第 2 層，top-k = 4，固定）
-              +  今天     （第 1 層，最多 12 萬字元）
-
-資料庫無限成長  ·  prompt 不會"></p>
-    </div>
+<section id="overview"><div class="wrap">
+  <div class="sec-h" data-en="What it does" data-zh="它在做什麼"></div>
+  <h2 data-en="Someone you talk to, who gets to know you" data-zh="一個你用講的、而且會越來越懂你的朋友"></h2>
+  <p class="lede" style="font-size:16px" data-en="Speak about your day. It transcribes what you said, reflects it back, and answers out loud — then saves the exchange so tomorrow it remembers. Over time it learns your goals, habits, and what helps you." data-zh="用講的聊聊你的一天。它把你說的轉成文字、反映回來、再用聲音回答 —— 然後把這次對話存下來，明天就記得。久了它會學到你的目標、習慣，還有什麼對你有用。"></p>
+  <div class="grid">
+    <div class="card"><div class="n">01</div>
+      <h3 data-en="Talk, don't type" data-zh="用講的，不用打字"></h3>
+      <p data-en="Tap the mic and speak. OpenAI transcribes you, Minerva replies, and Google Cloud TTS reads the answer back in a real British voice." data-zh="點麥克風開口說。OpenAI 幫你轉錄，Minerva 回覆，Google Cloud TTS 再用真正的英國腔把答案唸回來。"></p></div>
+    <div class="card"><div class="n">02</div>
+      <h3 data-en="It remembers" data-zh="它會記得"></h3>
+      <p data-en="Every exchange is saved as a journal entry. Nothing is forgotten when you close the tab — the whole point a stateless chatbot can't manage." data-zh="每次對話都存成一筆日誌。關掉分頁不會被忘記 —— 這正是無狀態聊天機器人做不到的關鍵。"></p></div>
+    <div class="card"><div class="n">03</div>
+      <h3 data-en="Gets to know you" data-zh="越來越懂你"></h3>
+      <p data-en="A rolling, LLM-condensed profile — your goals, habits, triggers, what helps — is injected into every reply, so Minerva always talks with a fresh sense of who you are." data-zh="一份滾動、由 LLM 濃縮的 profile（目標、習慣、地雷、什麼有用）注入每次回覆，讓Minerva總是帶著對你最新的理解說話。"></p></div>
+    <div class="card"><div class="n">04</div>
+      <h3 data-en="Wins, You, and Mantra" data-zh="Wins、You、Mantra"></h3>
+      <p data-en="Wins collects what you actually did, day by day. You is a passage about who you are, written from that whole record. Mantra holds the lines you keep — and she uses your own words back at you." data-zh="Wins 累積你每天真的做了什麼。You 是從那整份紀錄寫出來的一段「你是怎樣的人」。Mantra 收著你留下的句子 —— 她會用你自己的話回敬你。"></p></div>
   </div>
 </div></section>
 
-<!-- ---------------------------------------------------------------- -->
-<section class="band tint" id="engineering"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="Engineering" data-zh="工程"></span>
-    <h2 data-en="Three things that were broken, and what fixed them" data-zh="三件壞掉的事，以及怎麼修好的"></h2>
-    <p class="lede" data-en="Each of these started as a symptom someone could feel, not a metric on a dashboard." data-zh="每一件都是從「使用者感覺得到的症狀」開始的，不是儀表板上的數字。"></p>
+<section id="memory"><div class="wrap">
+  <div class="sec-h" data-en="The core idea" data-zh="核心概念"></div>
+  <h2 data-en="Three layers of memory" data-zh="三層記憶"></h2>
+  <p class="lede" style="font-size:16px" data-en="A general chatbot forgets you when the tab closes; feeding it your whole history every turn is expensive and eventually overflows the context window. Minerva splits memory into three layers, each answering a different question — so the journal can grow forever while the prompt stays bounded." data-zh="一般聊天機器人在你關掉分頁時就把你忘了；每一輪都塞整段歷史又貴、最後還會撐爆 context。Minerva 把記憶拆成三層，每層回答不同的問題 —— 所以日誌能無限長，prompt 卻維持有上限。"></p>
+  <div class="grid">
+    <div class="card"><div class="n" data-en="Layer 1 · Postgres SQL" data-zh="第 1 層 · Postgres SQL"></div>
+      <h3 data-en="Structured log" data-zh="結構化日誌"></h3>
+      <p data-en="Every exchange saved as a journal entry — transcript, reply, mood, wins, themes. Powers &quot;recall this day&quot; and &quot;this month's wins&quot; with plain SQL. No AI." data-zh="每次對話存成一筆日誌 —— 逐字稿、回覆、心情、成就、主題。用純 SQL 就能做「回顧這天」「這個月的成就」。不用 AI。"></p></div>
+    <div class="card"><div class="n" data-en="Layer 2 · pgvector" data-zh="第 2 層 · pgvector"></div>
+      <h3 data-en="Semantic recall" data-zh="語意回想"></h3>
+      <p data-en="Each entry is embedded. A search_past_entries tool pulls back the top-k most relevant past moments for the current topic — the &quot;understands you right now&quot; layer." data-zh="每筆紀錄都被 embed。search_past_entries 工具依現在的主題拉回最相關的 top-k 個過去片刻 —— 「當下懂你」那一層。"></p></div>
+    <div class="card"><div class="n" data-en="Layer 3 · LLM-condensed" data-zh="第 3 層 · LLM 濃縮"></div>
+      <h3 data-en="Rolling profile" data-zh="滾動 profile"></h3>
+      <p data-en="An LLM periodically condenses the journal into a short, fixed-size profile, injected into every conversation. This is what a stateless chatbot cannot do." data-zh="LLM 定期把日誌濃縮成一份簡短、固定大小的 profile，注入每次對話。這正是無狀態聊天機器人做不到的事。"></p></div>
+    <div class="card"><div class="n" data-en="The result" data-zh="結果"></div>
+      <h3 data-en="A bounded prompt, forever" data-zh="永遠有上限的 prompt"></h3>
+      <p data-en="Every prompt = profile + relevant recalled past + today's context. The database grows without limit; the prompt does not — so cost and context never blow up." data-zh="每次 prompt = profile + 相關的回想 + 今天的脈絡。資料庫無限成長，prompt 不會 —— 所以成本和 context 永遠不會爆。"></p></div>
   </div>
+<pre style="margin-top:26px" data-en="every prompt  =  profile (layer 3)
+              +  relevant recalled past (layer 2)
+              +  today's context
 
-  <div class="spread">
-    <div class="note">
-      <span class="big">0.6s → 11s</span>
-      <span data-en="one sentence vs. a whole reply" data-zh="一句 vs. 整篇回覆"></span>
-      <span class="file">frontend/src/App.jsx</span>
-    </div>
-    <div class="prose">
-      <h3 data-en="Eleven seconds of silence that read as broken" data-zh="十一秒的沉默，使用者以為壞了"></h3>
-      <p data-en="Tapping the speaker did nothing for eleven seconds. The cause: synthesis cost is superlinear — a single sentence comes back in about 0.6s, a whole reply takes about 11s — so asking for the lot meant a long dead pause with no feedback. People tapped again, and audio stacked up." data-zh="點下播放後，有十一秒什麼都沒發生。原因是合成成本是超線性的 —— 單句大約 0.6 秒回來，整篇要約 11 秒 —— 所以一次要整篇，就是一段沒有任何回饋的死寂。使用者會再點一次，聲音就疊起來了。"></p>
-      <p data-en="The reply is now split on sentence ends into ~220-character chunks. The first chunk plays while the next is already being made, and speaking takes roughly ten times longer than synthesising, so the queue stays ahead of the voice. First sound arrives in about a second. Chunks already fetched are cached, so replaying costs nothing." data-zh="現在回覆會按句尾切成約 220 字元一段。第一段在播的同時，下一段已經在做了 —— 唸一段的時間大約是合成的十倍，所以佇列永遠跑在聲音前面。第一聲大約 1 秒就出來。抓過的段落會快取，重播不用再付錢。"></p>
-    </div>
-  </div>
+# journal in Postgres can grow forever — the prompt stays a fixed size." data-zh="每次 prompt  =  profile（第 3 層）
+              +  相關的回想（第 2 層）
+              +  今天的脈絡
 
-  <div class="spread">
-    <div class="note">
-      <span class="big" data-en="iOS only" data-zh="只有 iOS"></span>
-      <span data-en="&quot;I couldn't hear that&quot; — on phones, every time" data-zh="手機上每次都「我聽不到」"></span>
-      <span class="file">app/services/voice.py</span>
-    </div>
-    <div class="prose">
-      <h3 data-en="The recording that was mislabelled, not unheard" data-zh="不是沒錄到，是標錯了"></h3>
-      <p data-en="Voice worked on desktop and failed on every iPhone. The upload was hardcoded as webm, but iOS Safari records mp4 — so the file was mislabelled, the transcriber couldn't read it at all, and the app surfaced that as &quot;I couldn't hear that.&quot; A wrong error message hid a format bug." data-zh="桌機正常，iPhone 每次都失敗。上傳被寫死成 webm，但 iOS Safari 錄的是 mp4 —— 檔案標錯，轉譯器根本讀不了，前端就顯示成「我聽不到」。一個錯的錯誤訊息，蓋住了一個格式 bug。"></p>
-      <p data-en="The fix is to stop assuming: ask the recorder for its own mimeType and name the upload to match. Empty transcriptions now say so, instead of quietly sending nothing." data-zh="修法是不要再假設：跟錄音器問它自己的 mimeType，上傳就照那個命名。轉出來是空的時候會明講，而不是默默送出空字串。"></p>
-    </div>
-  </div>
-
-  <div class="spread">
-    <div class="note">
-      <span class="big" data-en="Two taps" data-zh="連點兩下"></span>
-      <span data-en="both replies played, overlapping" data-zh="兩個回覆同時播，疊在一起"></span>
-      <span class="file">frontend/src/App.jsx</span>
-    </div>
-    <div class="prose">
-      <h3 data-en="A guard that was reading stale state" data-zh="一個讀到過期狀態的防呆"></h3>
-      <p data-en="There was already a guard against double playback — it just didn't work. It read React state, and two quick taps land inside a single render, so the second tap still saw &quot;nothing is playing&quot; and fired its own request. Both then played over each other." data-zh="本來就有防止重複播放的判斷 —— 只是沒作用。它讀的是 React state，而兩下快點會落在同一次 render 裡，所以第二下看到的還是「現在沒在播」，就又送了一次請求。兩個接著一起播。"></p>
-      <p data-en="The active reply is now tracked in a ref, which updates the moment it's set rather than on the next render, and every exit path funnels through one stop function so nothing is ever left running." data-zh="現在正在播的那一則記在 ref 裡 —— ref 是當下就更新，不用等下一次 render —— 而且所有結束路徑都收斂到同一個 stop 函式，不會有東西被留著跑。"></p>
-    </div>
-  </div>
+# Postgres 裡的日誌可以無限長 —— prompt 維持固定大小。"></pre>
 </div></section>
 
-<!-- ---------------------------------------------------------------- -->
-<section class="band" id="seams"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="Maintainability" data-zh="可維護性"></span>
-    <h2 data-en="Seams left on purpose" data-zh="刻意留下的接縫"></h2>
-    <p class="lede" data-en="Models change faster than anything else in this stack, so the parts most likely to be replaced are the parts easiest to replace." data-zh="這個技術棧裡，模型換得比什麼都快 —— 所以最可能被換掉的東西，就做成最好換的。"></p>
-  </div>
-  <ul class="ruled">
-    <li data-en="<b>Swap the LLM with one environment variable.</b> Exactly one file knows which vendor is in use; everything downstream just calls the model. ChatGPT and Claude are both supported, and nothing else changes." data-zh="<b>換 LLM 只要改一個環境變數。</b>全專案只有一個檔案知道現在用哪一家，下游只管呼叫模型。ChatGPT 和 Claude 都支援，其他一行都不用動。"></li>
-    <li data-en="<b>Three speech backends behind one call.</b> Google Cloud TTS, ElevenLabs and OpenAI sit behind a single speak(). The default is Google — a genuinely British voice on a generous free tier, after ElevenLabs proved too expensive per character to leave on." data-zh="<b>三個語音後端藏在同一個呼叫後面。</b>Google Cloud TTS、ElevenLabs、OpenAI 都在同一個 speak() 後面。預設用 Google —— 真正的英國腔、免費額度夠大；ElevenLabs 按字元計費太貴，不適合常開。"></li>
-    <li data-en="<b>A new endpoint is one file and one line.</b> Route modules are collected in one router; the app entrypoint never changes as the API grows." data-zh="<b>加一個 endpoint = 一個檔案 + 一行。</b>route 檔案集中在一個 router 裡註冊，API 長大時進入點永遠不用改。"></li>
-    <li data-en="<b>49 tests that need no keys and no network.</b> The coach runs against a fake, offline model, so the whole suite finishes in about two seconds and costs nothing to run on every push." data-zh="<b>49 個測試，不用 key、不用網路。</b>教練跑在一個離線的假模型上，整套大約兩秒跑完，每次 push 都跑也不花錢。"></li>
-    <li data-en="<b>A misconfigured deploy refuses to boot.</b> Missing keys are checked at startup, so the container fails its health check and rolls back — instead of serving a 500 to the first real person who talks to her." data-zh="<b>設定錯的版本開不起來。</b>缺 key 在啟動時就檢查，容器過不了健康檢查、自動回滾 —— 而不是等第一個真的來說話的人拿到 500。"></li>
-  </ul>
-</div></section>
-
-<!-- ---------------------------------------------------------------- -->
-<section class="band tint" id="debt"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="Known debt" data-zh="已知的債"></span>
-    <h2 data-en="What I'd fix next, in this order" data-zh="接下來會修的，照這個順序"></h2>
-  </div>
-  <ul class="ruled">
-    <li data-en="<b>Enrichment still runs while you wait.</b> After the reply is generated, tagging, embedding and the profile rewrites all happen before the response goes out — an extra LLM call every turn, and three on the turns that trigger a rewrite. The journal write should stay on the request path because it must never be lost; the rest shouldn't." data-zh="<b>加值工作還卡在你等待的時候。</b>回覆生出來之後，抽標籤、embedding、重寫 profile 都在回應送出前跑完 —— 每輪多一次 LLM，輪到重寫時多三次。日誌寫入該留在請求路徑上（它不能掉），其他不該。"></li>
-    <li data-en="<b>The frontend is one 800-line file.</b> Recording, playback, streaming and four screens all live in App.jsx. It works, and it is the first thing I'd split." data-zh="<b>前端是一個 800 行的檔案。</b>錄音、播放、串流和四個畫面全在 App.jsx 裡。它能動，但也是我第一個會拆的東西。"></li>
-    <li data-en="<b>No migrations.</b> Tables are created on boot, which adds columns fine but can't remove one. A real migration tool is overdue." data-zh="<b>沒有 migration。</b>資料表是開機時建的，加欄位沒問題，但刪不掉。該補一個真正的 migration 工具了。"></li>
-    <li data-en="<b>Speech has no rate limit.</b> Synthesis is billed per character and is only protected by requiring sign-in. That's enough for one user and not enough for a public launch." data-zh="<b>語音沒有流量限制。</b>合成按字元計費，現在只靠「要登入」擋著。一個人用夠了，要公開上線不夠。"></li>
-  </ul>
-</div></section>
-
-<!-- ---------------------------------------------------------------- -->
-<section class="band" id="architecture"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="Architecture" data-zh="架構"></span>
-    <h2 data-en="One spoken exchange, end to end" data-zh="一次語音對話，從頭到尾"></h2>
-    <p class="lede" data-en="Click any box to see what it does and which file it lives in — or trace a full request. The top flow is a single voice turn; the bottom lane is how that same exchange feeds all three memory layers." data-zh="點任一方塊看它做什麼、在哪個檔案 —— 或追蹤一次完整請求。上半是一次語音對話；下半是同一次對話怎麼餵養三層記憶。"></p>
-  </div>
+<section id="architecture"><div class="wrap">
+  <div class="sec-h" data-en="Architecture" data-zh="架構"></div>
+  <h2 data-en="One spoken exchange, end to end" data-zh="一次語音對話，從頭到尾"></h2>
+  <p class="lede" style="font-size:16px" data-en="Click any box to see what it does and which file it lives in — or trace a full request. The top flow is a single voice turn; the bottom lane is how that same exchange feeds all three memory layers." data-zh="點任一方塊看它做什麼、在哪個檔案 —— 或追蹤一次完整請求。上半是一次語音對話；下半是同一次對話怎麼餵養三層記憶。"></p>
 
   <div class="archwrap">
     <div class="diagram">
-      <div class="lane" data-en="Per request — you speak" data-zh="每次請求 — 你開口說"></div>
-      <button class="node" type="button" data-node="browser"><b>Browser · record</b><small>frontend/App.jsx</small></button>
+      <div class="lane-h" data-en="Per request — you speak" data-zh="每次請求 — 你開口說"></div>
+      <button class="node" data-node="browser"><b>Browser · record</b><small>frontend/App.jsx</small></button>
       <span class="v">↓</span>
-      <button class="node" type="button" data-node="api"><b>FastAPI · /transcribe</b><small>api/routes/voice.py</small></button>
+      <button class="node" data-node="api"><b>FastAPI · /transcribe</b><small>api/routes/voice.py</small></button>
       <span class="v">↓</span>
-      <button class="node" type="button" data-node="stt"><b>gpt-4o-mini-transcribe</b><small>services/voice.py</small></button>
+      <button class="node" data-node="stt"><b>gpt-4o-mini-transcribe</b><small>services/voice.py</small></button>
       <span class="v">↓</span>
 
       <div class="loopbox">
-        <div class="looplabel" data-en="Agent loop — repeats until Minerva replies" data-zh="Agent 迴圈 — 重複到 Minerva 回覆為止"></div>
-        <button class="node hot" type="button" data-node="agent"><b>LangChain agent</b><small>services/agent.py · create_agent</small></button>
+        <div class="looplabel" data-en="Agent loop — repeats until Minerva replies" data-zh="Agent 迴圈 — 重複到Minerva回覆為止"></div>
+        <button class="node hot" data-node="agent"><b>LangChain agent</b><small>services/agent.py · create_agent</small></button>
         <span class="v">↓ <span data-en="each turn uses" data-zh="每一輪用到"></span></span>
         <div class="row2">
-          <div class="toolbox">
-            <button class="node outer" type="button" data-node="profileinj"><b>profile injected</b><small>services/profile.py · layer 3</small></button>
-            <div class="connector">↓ <span data-en="prepended to the prompt" data-zh="接到 prompt 前面"></span></div>
-            <div class="node ghost inner"><b data-en="who you are" data-zh="你是誰"></b><small data-en="fixed size" data-zh="固定大小"></small></div>
+          <div class="branch">
+            <div class="toolbox">
+              <button class="node outer" data-node="profileinj"><b>profile injected</b><small>services/profile.py · layer 3</small></button>
+              <div class="connector">↓ <span data-en="prepended to the prompt" data-zh="接到 prompt 前面"></span></div>
+              <div class="node ghost inner"><b data-en="who you are" data-zh="你是誰"></b><small data-en="fixed size" data-zh="固定大小"></small></div>
+            </div>
           </div>
-          <div class="toolbox">
-            <button class="node outer" type="button" data-node="recall"><b>search_past_entries</b><small>services/recall.py · layer 2</small></button>
-            <div class="connector">↓ <span data-en="internally queries" data-zh="內部查詢"></span></div>
-            <button class="node inner" type="button" data-node="pgv"><b>pgvector · top-k</b><small>PGVector + embeddings</small></button>
+          <div class="branch">
+            <div class="toolbox">
+              <button class="node outer" data-node="recall"><b>search_past_entries</b><small>services/recall.py · layer 2</small></button>
+              <div class="connector">↓ <span data-en="internally queries" data-zh="內部查詢"></span></div>
+              <button class="node inner" data-node="pgv"><b>pgvector · top-k</b><small>PGVector + embeddings</small></button>
+            </div>
           </div>
         </div>
         <span class="v">↓</span>
-        <button class="node hot" type="button" data-node="llm"><b>gpt-5.3-chat-latest replies</b><small>services/chat_model.py</small></button>
+        <button class="node hot" data-node="llm"><b>gpt-5.3-chat-latest replies</b><small>services/chat_model.py</small></button>
         <div class="loopback" data-en="↺ tool results go back to the agent" data-zh="↺ 工具結果送回 agent"></div>
       </div>
 
       <span class="v">↓ <span data-en="reply text" data-zh="回覆文字"></span></span>
-      <button class="node" type="button" data-node="tts"><b>Google Cloud TTS · text→speech</b><small>services/voice.py</small></button>
+      <button class="node" data-node="tts"><b>Google Cloud TTS · text→speech</b><small>services/voice.py</small></button>
       <span class="v">↓</span>
-      <button class="node done" type="button" data-node="play"><b>Played aloud</b><small>→ browser</small></button>
+      <button class="node done" data-node="play"><b>Played aloud</b><small>→ browser</small></button>
 
-      <div class="lane" style="margin-top:24px" data-en="After every exchange — feed the three memory layers" data-zh="每次對話之後 — 餵養三層記憶"></div>
+      <div class="lane-h" style="margin-top:26px" data-en="After every exchange — feed the three memory layers" data-zh="每次對話之後 — 餵養三層記憶"></div>
       <div class="row3">
-        <button class="node" type="button" data-node="log"><b>1 · Postgres log</b><small>services/entries.py</small></button>
+        <button class="node" data-node="log"><b>1 · Postgres log</b><small>services/entries.py</small></button>
         <span class="arr">+</span>
-        <button class="node" type="button" data-node="embed"><b>2 · embed → pgvector</b><small>services/recall.py</small></button>
+        <button class="node" data-node="embed"><b>2 · embed → pgvector</b><small>services/recall.py</small></button>
         <span class="arr">+</span>
-        <button class="node" type="button" data-node="recondense"><b>3 · re-condense profile</b><small>services/profile.py</small></button>
+        <button class="node" data-node="recondense"><b>3 · re-condense profile</b><small>services/profile.py</small></button>
       </div>
     </div>
 
@@ -467,16 +250,13 @@ the database grows without limit  ·  the prompt does not" data-zh="每次 promp
     </aside>
   </div>
 
-  <button class="btn solid" id="traceBtn" type="button" style="margin-top:26px" data-en="▶ Trace a request" data-zh="▶ 追蹤一次請求"></button>
+  <button class="btn primary" id="traceBtn" style="margin-top:24px" data-en="▶ Trace a request" data-zh="▶ 追蹤一次請求"></button>
 </div></section>
 
-<!-- ---------------------------------------------------------------- -->
-<section class="band tint" id="conversation"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="Memory in action" data-zh="記憶實際運作"></span>
-    <h2 data-en="Why remembering changes the reply" data-zh="記得，讓回覆完全不一樣"></h2>
-    <p class="lede" data-en="Because she reads your profile and recalls a similar past moment before answering, the reply is grounded in your real history instead of generic advice." data-zh="因為她在回答前會讀你的 profile、回想一個相似的過去片刻，回覆是扎在你真實歷史上的，而不是通用建議。"></p>
-  </div>
+<section id="conversation"><div class="wrap">
+  <div class="sec-h" data-en="Memory in action" data-zh="記憶實際運作"></div>
+  <h2 data-en="Why remembering changes the reply" data-zh="記得，讓回覆完全不一樣"></h2>
+  <p class="lede" style="font-size:16px" data-en="Because Minerva reads your profile and recalls a similar past moment before answering, the reply is grounded in your real history instead of generic advice." data-zh="因為Minerva在回答前會讀你的 profile、回想一個相似的過去片刻，回覆是扎在你真實歷史上的，而不是通用建議。"></p>
 <pre data-en="POST /transcribe   (audio: today.webm)
 
 → transcript:  &quot;Skipped my run again. Feels like I keep starting over.&quot;
@@ -504,33 +284,41 @@ the database grows without limit  ·  the prompt does not" data-zh="每次 promp
 # profile 每幾筆就重新濃縮一次。"></pre>
 </div></section>
 
-<!-- ---------------------------------------------------------------- -->
-<section class="band" id="stack"><div class="wrap">
-  <div class="band-head">
-    <span class="eyebrow" data-en="Built with" data-zh="使用技術"></span>
-    <h2 data-en="Stack" data-zh="技術棧"></h2>
-  </div>
-  <div class="chips">
+<section id="decisions"><div class="wrap">
+  <div class="sec-h" data-en="Design decisions" data-zh="設計決策"></div>
+  <h2 data-en="Trade-offs, made on purpose" data-zh="刻意做的取捨"></h2>
+  <ul class="clean">
+    <li data-en="<b>Three memory layers instead of one</b> — a stateless chatbot forgets, and stuffing the whole history into every prompt doesn't scale. Splitting memory keeps the prompt a fixed size no matter how large the journal grows." data-zh="<b>三層記憶，而不是一層</b> —— 無狀態聊天機器人會忘記，把整段歷史塞進每次 prompt 又不 scale。把記憶拆開，不管日誌多大，prompt 都維持固定大小。"></li>
+    <li data-en="<b>LangChain on purpose</b> — agent, RAG, and memory in one industry-standard stack (create_agent + a dynamic prompt + a pgvector tool) instead of hand-rolling the tool-calling loop." data-zh="<b>刻意用 LangChain</b> —— agent、RAG、記憶一套業界標準搞定（create_agent + dynamic prompt + pgvector 工具），而不是自己手刻工具呼叫迴圈。"></li>
+    <li data-en="<b>One database for both</b> — Postgres holds the SQL journal and the pgvector embeddings side by side, so there's one store to run and back up, not two." data-zh="<b>一個資料庫兩用</b> —— Postgres 同時放 SQL 日誌和 pgvector 向量，只要顧一個儲存、備一份，而不是兩個。"></li>
+    <li data-en="<b>Per-person by construction</b> — a verified Firebase uid scopes every entry, recall, and profile, and the public repo / demo use seed data only, with no keys committed." data-zh="<b>設計上就逐人隔離</b> —— 驗過的 Firebase uid 把每筆紀錄、回想、profile 都綁到本人；公開的 repo / demo 只用種子資料，且不提交任何 key。"></li>
+  </ul>
+</div></section>
+
+<section id="stack"><div class="wrap">
+  <div class="sec-h" data-en="Built with" data-zh="使用技術"></div>
+  <h2 data-en="Stack" data-zh="技術棧"></h2>
+  <div class="stack">
     <div class="chip"><b>FastAPI</b></div>
     <div class="chip">Python 3.12</div>
-    <div class="chip"><b>LangChain</b> <span>agent · RAG · memory</span></div>
-    <div class="chip"><b>OpenAI</b> <span>gpt-5.3-chat-latest</span></div>
-    <div class="chip"><b>OpenAI</b> <span>gpt-4o-mini-transcribe · STT</span></div>
-    <div class="chip"><b>Google Cloud TTS</b> <span>en-GB Chirp3-HD</span></div>
+    <div class="chip"><b>LangChain</b> <span style="color:var(--muted)">agent · RAG · memory</span></div>
+    <div class="chip"><b>OpenAI</b> <span style="color:var(--muted)">gpt-5.3-chat-latest</span></div>
+    <div class="chip"><b>OpenAI</b> <span style="color:var(--muted)">gpt-4o-mini-transcribe · STT</span></div>
+    <div class="chip"><b>Google Cloud TTS</b> <span style="color:var(--muted)">en-GB Chirp3-HD</span></div>
     <div class="chip"><b>Postgres + pgvector</b></div>
     <div class="chip">OpenAI embeddings</div>
     <div class="chip"><b>Firebase Auth</b></div>
     <div class="chip">LangSmith</div>
     <div class="chip">React (Vite)</div>
     <div class="chip">ruff</div>
-    <div class="chip"><b>GitHub Actions</b> <span>CI + auto-deploy</span></div>
-    <div class="chip"><b>Google Cloud</b> <span>Run · SQL · Secrets</span></div>
+    <div class="chip"><b>GitHub Actions</b> <span style="color:var(--muted)">CI + auto-deploy</span></div>
+    <div class="chip"><b>Google Cloud</b> <span style="color:var(--muted)">Run · SQL · Secrets</span></div>
   </div>
 </div></section>
 
 <footer><div class="wrap">
-  <span data-en="Minerva · FastAPI + LangChain + Postgres/pgvector · " data-zh="Minerva · FastAPI + LangChain + Postgres/pgvector · "></span>
-  <a href="https://github.com/srichsun/Minerva" target="_blank" rel="noopener">GitHub</a>
+  <span data-en="Minerva · FastAPI + LangChain + OpenAI · " data-zh="Minerva · FastAPI + LangChain + OpenAI · "></span>
+  <a href="https://github.com/srichsun/Minerva" target="_blank" rel="noopener" style="color:var(--accent)">GitHub</a>
 </div></footer>
 
 <script>
@@ -555,10 +343,10 @@ the database grows without limit  ·  the prompt does not" data-zh="每次 promp
       zh:["LangChain agent","用 create_agent 打造。它幫我們跑完整個「思考、可能呼叫工具、重複」的迴圈，並自己決定什麼時候回想過去會有幫助。這裡沒有 checkpointer：每一輪都直接從 Postgres 重播今天的對話，所以重啟或換裝置都不會掉。"]},
     profileinj:{file:"app/services/profile.py",
       en:["Profile injected — memory layer 3","Before every reply, your rolling profile (goals, habits, triggers, what helps) is prepended to the prompt. It's LLM-condensed and fixed-size, so Minerva always talks with a fresh sense of who you are — without re-reading your whole history."],
-      zh:["注入 profile —— 記憶第 3 層","每次回覆前，把你的滾動 profile（目標、習慣、地雷、什麼有用）接到 prompt 前面。它由 LLM 濃縮、大小固定，所以 Minerva 總是帶著對你最新的理解說話，卻不用重讀整段歷史。"]},
+      zh:["注入 profile —— 記憶第 3 層","每次回覆前，把你的滾動 profile（目標、習慣、地雷、什麼有用）接到 prompt 前面。它由 LLM 濃縮、大小固定，所以Minerva總是帶著對你最新的理解說話，卻不用重讀整段歷史。"]},
     recall:{file:"app/services/recall.py",
       en:["search_past_entries — memory layer 2","The one tool Minerva can call. Give it the current topic; it returns the most relevant past entries. This is the “understands you right now” layer — episodic memory, separate from the plain-SQL day/wins queries."],
-      zh:["search_past_entries —— 記憶第 2 層","Minerva 唯一能呼叫的工具。給它現在的主題，它回傳最相關的過去紀錄。這是「當下懂你」那一層 —— 情節記憶，跟純 SQL 的日/成就查詢分開。"]},
+      zh:["search_past_entries —— 記憶第 2 層","Minerva唯一能呼叫的工具。給它現在的主題，它回傳最相關的過去紀錄。這是「當下懂你」那一層 —— 情節記憶，跟純 SQL 的日/成就查詢分開。"]},
     pgv:{file:"app/services/recall.py · PGVector",
       en:["pgvector · top-k — what the tool does inside","Not a separate step — this runs inside the tool call above. Embeds the query and asks pgvector for the top-k closest past entries. Top-k is fixed, so the recalled slice stays constant no matter how big the journal grows."],
       zh:["pgvector · top-k —— 工具內部在做的事","不是另外一步 —— 這是在上面那次工具呼叫「裡面」跑的。把 query 轉成向量，向 pgvector 要最接近的 top-k 筆過去紀錄。top-k 固定，所以不管日誌變多大，回想的那一片都維持固定大小。"]},
@@ -570,16 +358,16 @@ the database grows without limit  ·  the prompt does not" data-zh="每次 promp
       zh:["Google Cloud TTS · 文字轉語音","回覆用真正的英國腔唸出來（en-GB-Chirp3-HD-Callirrhoe）。合成延遲隨長度超線性成長，所以前端把回覆切成約 220 字元的句子，播一段的同時去抓下一段 —— 第一聲大約 1 秒就出來。ElevenLabs 和 OpenAI TTS 在同一個 speak() 後面。"]},
     play:{file:"frontend/src/App.jsx",
       en:["Played aloud","The browser plays the mp3, so you hear Minerva answer. One exchange, done — and now it becomes memory."],
-      zh:["唸出來播放","瀏覽器播放 mp3，你就聽到 Minerva 的回答。一次對話完成 —— 接著它變成記憶。"]},
+      zh:["唸出來播放","瀏覽器播放 mp3，你就聽到Minerva的回答。一次對話完成 —— 接著它變成記憶。"]},
     log:{file:"app/services/entries.py",
       en:["Memory layer 1 · structured log","Every exchange is saved to Postgres as a journal entry — transcript, reply, plus mood / wins / themes Minerva pulls out. Plain SQL powers “recall this day” and “this month's wins”. No AI needed."],
-      zh:["記憶第 1 層 · 結構化日誌","每次對話都存進 Postgres 成一筆日誌 —— 逐字稿、回覆，加上 Minerva 抽出的心情 / 成就 / 主題。純 SQL 就能做「回顧這天」「這個月的成就」。不用 AI。"]},
+      zh:["記憶第 1 層 · 結構化日誌","每次對話都存進 Postgres 成一筆日誌 —— 逐字稿、回覆，加上Minerva抽出的心情 / 成就 / 主題。純 SQL 就能做「回顧這天」「這個月的成就」。不用 AI。"]},
     embed:{file:"app/services/recall.py",
       en:["Memory layer 2 · embed","The same entry is embedded and stored in pgvector, keyed by its SQL row id — so re-indexing overwrites, never duplicates. That's what makes it findable by future searches."],
       zh:["記憶第 2 層 · embed","同一筆紀錄被 embed 後存進 pgvector，用它的 SQL row id 當 key —— 所以重新索引是覆蓋，不會重複。這讓它未來被搜尋得到。"]},
     recondense:{file:"app/services/profile.py",
       en:["Memory layer 3 · re-condense","Every few entries, an LLM folds recent journal into your profile — keeping what's still true, dropping one-off trivia. It's how Minerva steadily gets to know you while the profile stays a fixed size."],
-      zh:["記憶第 3 層 · 重新濃縮","每幾筆紀錄，就由 LLM 把最近的日誌摺進你的 profile —— 留下還成立的、丟掉一次性瑣事。這就是 Minerva 持續認識你、而 profile 又維持固定大小的方法。"]}
+      zh:["記憶第 3 層 · 重新濃縮","每幾筆紀錄，就由 LLM 把最近的日誌摺進你的 profile —— 留下還成立的、丟掉一次性瑣事。這就是Minerva持續認識你、而 profile 又維持固定大小的方法。"]}
   };
 
   function renderDetail(id){
@@ -594,14 +382,14 @@ the database grows without limit  ·  the prompt does not" data-zh="每次 promp
 
   function apply(){
     document.documentElement.setAttribute("data-lang", lang);
-    document.documentElement.lang = (lang === "zh") ? "zh-Hant" : "en";
-    els.forEach(function(el){ el.innerHTML = el.getAttribute("data-" + lang); });
-    document.getElementById("langBtn").textContent = (lang === "en") ? "中文" : "English";
+    document.documentElement.lang = (lang==="zh") ? "zh-Hant" : "en";
+    els.forEach(function(el){ el.innerHTML = el.getAttribute("data-"+lang); });
+    document.getElementById("langBtn").textContent = (lang==="en") ? "中文" : "English";
     renderDetail(currentNode);
   }
 
   document.getElementById("langBtn").addEventListener("click", function(){
-    lang = (lang === "en") ? "zh" : "en"; apply();
+    lang = (lang==="en") ? "zh" : "en"; apply();
   });
 
   // Click a box → show its detail.
