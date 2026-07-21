@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Deploy the Performance Coach API to Google Cloud: Cloud Run + Cloud SQL (Postgres
+# Provision Minerva on Google Cloud from scratch: Cloud Run + Cloud SQL (Postgres
 # with pgvector) + Secret Manager. Run after `gcloud auth login`.
+#
+# This is the FIRST-RUN script. To ship new code to the service that already
+# exists, don't run this — it rewrites every secret, and a missing DB_PASS would
+# overwrite DATABASE_URL with a broken URL. Just redeploy the image instead:
+#
+#     gcloud run deploy daily-coach --source . --region=asia-east1
 #
 # Reads API keys from the local .env (gitignored) and the Firebase service
 # account from secrets/firebase-admin.json. Idempotent-ish: re-running skips
@@ -12,11 +18,17 @@ REGION="asia-east1"            # Changhua, Taiwan — closest to the user
 INSTANCE="coach-db"
 DB_NAME="coach"
 DB_USER="coach"
-SERVICE="performance-coach"
+# The live service. Named before the project was renamed to Minerva; renaming it
+# would change the URL, which is already in Firebase's authorized domains.
+SERVICE="daily-coach"
 CONN="${PROJECT}:${REGION}:${INSTANCE}"
 
 cd "$(dirname "$0")/.."
 set -a; source .env; set +a   # load API keys from .env
+
+# Every secret below is rebuilt from these, so a missing one would silently
+# publish a broken value. Fail loudly instead.
+: "${DB_PASS:?set DB_PASS in .env — it is the Cloud SQL password for $DB_USER}"
 
 echo "==> 1. Set project + enable APIs"
 gcloud config set project "$PROJECT"
