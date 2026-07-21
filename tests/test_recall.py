@@ -4,6 +4,7 @@ PGVector needs a real Postgres with the vector extension, which we can't run
 here, so we mock the store. These tests check the glue: that we call the store
 the way we mean to, and format its results for the coach.
 """
+from app.models import CATEGORIES
 from app.services import recall
 
 
@@ -81,6 +82,38 @@ def test_recall_narrows_to_categories(monkeypatch):
         5,
         {"user_id": "u9", "category": {"$in": ["health & habits", "patterns"]}},
     )
+
+
+def test_k_grows_with_the_number_of_categories(monkeypatch):
+    """Two topics in one question shouldn't halve the depth of each — the
+    budget is per category, not per search."""
+    store = _FakeStore(docs=[_Doc("x")])
+    monkeypatch.setattr(recall, "_facts_store", lambda: store)
+
+    recall.recall("goals and training", user_id="u9",
+                  categories=["goals & aspirations", "health & habits"])
+
+    assert store.last[1] == recall.TOP_K * 2
+
+
+def test_k_is_capped_so_the_prompt_stays_bounded(monkeypatch):
+    """Asking for every category must not drag the whole journal into the
+    prompt — bounded prompt size is the point of the three layers."""
+    store = _FakeStore(docs=[_Doc("x")])
+    monkeypatch.setattr(recall, "_facts_store", lambda: store)
+
+    recall.recall("everything", user_id="u9", categories=list(CATEGORIES))
+
+    assert store.last[1] == recall.MAX_K
+
+
+def test_an_unfiltered_search_uses_the_plain_budget(monkeypatch):
+    store = _FakeStore(docs=[_Doc("x")])
+    monkeypatch.setattr(recall, "_facts_store", lambda: store)
+
+    recall.recall("anything", user_id="u9")
+
+    assert store.last[1] == recall.TOP_K
 
 
 def test_search_past_entries_tool_uses_the_runs_context(monkeypatch):

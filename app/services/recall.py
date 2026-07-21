@@ -21,16 +21,24 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_postgres import PGVector
 
 from app.core import config
+from app.models import Category
 
 # Kept separate from the SQL `facts` table; PGVector manages its own tables.
 # A distinct collection from any earlier per-entry store so fact ids and entry
 # ids can never collide.
 FACTS_COLLECTION = "facts"
 
-# How many facts to pull back per search. Facts are single sentences — much
-# shorter than a whole turn — so we pull more of them than the old per-turn
-# recall did, while keeping the prompt size fixed as history grows.
+# How many facts to pull back per category searched. Facts are single sentences
+# — much shorter than a whole turn — so we pull more of them than the old
+# per-turn recall did.
 TOP_K = 8
+
+# Searching two categories at once shouldn't halve the depth of each, so the
+# budget scales with how many were asked for. Capped so the prompt still can't
+# grow without bound: past this, extra facts are near-duplicates of ones already
+# in hand, and how often something recurs is the rolling profile's job (layer 3)
+# rather than something to establish by pulling back more of the same.
+MAX_K = 24
 
 
 @lru_cache(maxsize=1)
@@ -72,14 +80,18 @@ def index_fact(fact_id: int, text: str, user_id: str, category: str) -> None:
 def recall(
     query: str,
     user_id: str,
-    categories: list[str] | None = None,
-    k: int = TOP_K,
+    categories: list[Category] | None = None,
+    k: int | None = None,
 ) -> list[str]:
     """Return up to k of one person's facts most relevant to the query.
 
     When categories is given, the search is restricted to those categories
-    (the two metadata keys combine as an implicit AND).
+    (the two metadata keys combine as an implicit AND), and k grows with how
+    many were asked for — someone talking about their goals *and* their health
+    needs both covered properly, not four facts each. Pass k to override.
     """
+    if k is None:
+        k = min(TOP_K * max(1, len(categories or [])), MAX_K)
     metadata_filter: dict = {"user_id": user_id}
     if categories:
         metadata_filter["category"] = {"$in": categories}
@@ -91,7 +103,7 @@ def recall(
 def search_past_entries(
     query: str,
     runtime: ToolRuntime[str],
-    categories: list[str] | None = None,
+    categories: list[Category] | None = None,
 ) -> str | list[str]:
     """Search what you know about this person for facts related to what they are
     talking about now. Use this to ground your reply in their real history —
