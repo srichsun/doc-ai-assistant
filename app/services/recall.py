@@ -68,7 +68,7 @@ def recall(query: str, user_id: str, k: int = TOP_K) -> list[str]:
 
 
 @tool
-def search_past_entries(query: str, runtime: ToolRuntime[str]) -> str:
+def search_past_entries(query: str, runtime: ToolRuntime[str]) -> str | list[str]:
     """Search the person's past journal entries for moments related to what
     they are talking about now. Use this to ground your reply in their real
     history — what they said before, recurring patterns, or similar feelings —
@@ -78,4 +78,4 @@ def search_past_entries(query: str, runtime: ToolRuntime[str]) -> str:
     hits = recall(query, user_id=runtime.context)
     if not hits:
         return "No related past entries found."
-    return "\n\n".join(f"- {h}" for h in hits)
+    return hits

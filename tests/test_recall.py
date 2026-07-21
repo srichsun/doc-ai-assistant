@@ -73,7 +73,7 @@ def test_search_past_entries_tool_uses_the_runs_context(monkeypatch):
     )
     out = recall.search_past_entries.func("how am I doing", _Runtime("u-caller"))
 
-    assert out == "- a win\n\n- a worry"
+    assert out == ["a win", "a worry"]
     assert seen["uid"] == "u-caller"
 
 

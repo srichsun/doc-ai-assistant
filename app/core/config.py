@@ -5,35 +5,39 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# LLM. The coach's "brain" is swappable via LangChain wrappers — set
-# LLM_PROVIDER to "openai" (ChatGPT) or "anthropic" (Claude).
+# --- LLM ("the coach's brain") ---
+# Swappable via LangChain wrappers — set LLM_PROVIDER to "openai" (ChatGPT) or
+# "anthropic" (Claude). OPENAI_API_KEY doubles as the key for STT and
+# embeddings below, regardless of which provider is chosen as the brain.
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "claude-haiku-4-5")          # used if anthropic
+ANTHROPIC_CHAT_MODEL = os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5")
 # gpt-5.x-chat-latest is the model family that powers ChatGPT itself — the
 # warm, structured style the product is known for. (gpt-4o was two+ years old.)
 OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-5.3-chat-latest")
-# Effectively uncapped so the coach can write long, unhurried, detailed
-# reflections. This is a ceiling, not a target — length is driven by the prompt.
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
+# Ceiling, not a target — length is driven by the prompt. Sized from real
+# replies (persona + tools), which run 340-480 completion tokens; this leaves
+# ~4x headroom for a longer day without letting a runaway generation drag on.
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "2048"))
 
-# Database (journal entries). Defaults to the local Postgres from
-# docker-compose; tests point this at an in-memory SQLite instead.
+# --- Database (journal entries) ---
+# Defaults to the local Postgres from docker-compose; tests point this at an
+# in-memory SQLite instead.
 DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql+psycopg://coach:coach@localhost:5433/coach"
 )
 
-# OpenAI key (STT, embeddings, and the chat model when LLM_PROVIDER=openai).
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-# Speech-to-text. gpt-4o-mini-transcribe is newer and more accurate than
-# whisper-1, at a similar price.
+# --- Speech-to-text & embeddings (both OpenAI, regardless of LLM_PROVIDER) ---
+# gpt-4o-mini-transcribe is newer and more accurate than whisper-1, at a
+# similar price.
 STT_MODEL = os.getenv("STT_MODEL", "gpt-4o-mini-transcribe")
 # Embedding model for semantic recall over past entries (pgvector).
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
-# Voice output (TTS). "google" (Cloud TTS — covered by GCP credit, generous
-# free tier, British voices) is the default; "elevenlabs" and "openai" are
-# swappable alternatives.
+# --- Voice output (TTS) ---
+# "google" (Cloud TTS — covered by GCP credit, generous free tier, British
+# voices) is the default; "elevenlabs" and "openai" are swappable alternatives.
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "google")
 # Google Cloud TTS (used when TTS_PROVIDER=google). Chirp3-HD "Callirrhoe" is a
 # natural British female. Rate stays at 1.0: slowing her down was meant to sound
@@ -51,14 +55,16 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "NtS6nEHDYMQC9QczMQuq")
 ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5")
 
-# Firebase Admin service-account file, used to verify sign-in tokens.
+# --- Firebase ---
+# Admin service-account file, used to verify sign-in tokens.
 FIREBASE_CREDENTIALS = os.getenv(
     "FIREBASE_CREDENTIALS", "secrets/firebase-admin.json"
 )
 
-# Observability (LangSmith). LangChain auto-traces every chain/agent call when
-# these env vars are present — setting the API key is enough. We default
-# tracing on and name the project so traces are grouped in the LangSmith UI.
+# --- Observability (LangSmith) ---
+# LangChain auto-traces every chain/agent call when these env vars are
+# present — setting the API key is enough. We default tracing on and name the
+# project so traces are grouped in the LangSmith UI.
 LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY", "")
 if LANGSMITH_API_KEY:
     os.environ.setdefault("LANGSMITH_TRACING", "true")

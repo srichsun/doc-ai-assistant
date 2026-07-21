@@ -19,11 +19,13 @@ def build_chat_model() -> BaseChatModel:
             model=config.OPENAI_CHAT_MODEL,
             api_key=config.OPENAI_API_KEY,
             max_tokens=config.MAX_TOKENS,
-            timeout=30.0,
+            timeout=20.0,
         )
-    return ChatAnthropic(
-        model_name=config.CHAT_MODEL,
-        api_key=config.ANTHROPIC_API_KEY,
-        max_tokens=config.MAX_TOKENS,
-        timeout=30.0,
-    )
+    if config.LLM_PROVIDER == "anthropic":
+        return ChatAnthropic(
+            model_name=config.ANTHROPIC_CHAT_MODEL,
+            api_key=config.ANTHROPIC_API_KEY,
+            max_tokens=config.MAX_TOKENS,
+            timeout=20.0,
+        )
+    raise ValueError(f"LLM_PROVIDER must be openai or anthropic, got {config.LLM_PROVIDER!r}")
