@@ -154,8 +154,8 @@
       <h3 data-en="Gets to know you" data-zh="越來越懂你"></h3>
       <p data-en="A rolling, LLM-condensed profile — your goals, habits, triggers, what helps — is injected into every reply, so Minerva always talks with a fresh sense of who you are." data-zh="一份滾動、由 LLM 濃縮的 profile（目標、習慣、地雷、什麼有用）注入每次回覆，讓Minerva總是帶著對你最新的理解說話。"></p></div>
     <div class="card"><div class="n">04</div>
-      <h3 data-en="Wins, You, and Mantra" data-zh="Wins、You、Mantra"></h3>
-      <p data-en="Wins collects what you actually did, day by day. You is a passage about who you are, written from that whole record. Mantra holds the lines you keep — and she uses your own words back at you." data-zh="Wins 累積你每天真的做了什麼。You 是從那整份紀錄寫出來的一段「你是怎樣的人」。Mantra 收著你留下的句子 —— 她會用你自己的話回敬你。"></p></div>
+      <h3 data-en="Mantra" data-zh="Mantra"></h3>
+      <p data-en="The lines you deliberately keep for your hardest days. They are injected into her prompt, so she can hand your own words back to you when they fit." data-zh="你特意為最難的日子留下的句子。它們會注入她的 prompt，需要的時候她會用你自己的話回敬你。"></p></div>
   </div>
 </div></section>
 
@@ -166,10 +166,10 @@
   <div class="grid">
     <div class="card"><div class="n" data-en="Layer 1 · Postgres SQL" data-zh="第 1 層 · Postgres SQL"></div>
       <h3 data-en="Structured log" data-zh="結構化日誌"></h3>
-      <p data-en="Every exchange saved as a journal entry — transcript, reply, mood, wins, themes. Powers &quot;recall this day&quot; and &quot;this month's wins&quot; with plain SQL. No AI." data-zh="每次對話存成一筆日誌 —— 逐字稿、回覆、心情、成就、主題。用純 SQL 就能做「回顧這天」「這個月的成就」。不用 AI。"></p></div>
+      <p data-en="Every exchange saved verbatim as a journal entry — transcript and reply. Powers &quot;recall this day&quot; with plain SQL, and stays the source of truth everything else is derived from. No AI." data-zh="每次對話原封不動存成一筆日誌 —— 逐字稿和回覆。用純 SQL 就能「回顧這天」，也是其他一切衍生資料的真相來源。不用 AI。"></p></div>
     <div class="card"><div class="n" data-en="Layer 2 · pgvector" data-zh="第 2 層 · pgvector"></div>
-      <h3 data-en="Semantic recall" data-zh="語意回想"></h3>
-      <p data-en="Each entry is embedded. A search_past_entries tool pulls back the top-k most relevant past moments for the current topic — the &quot;understands you right now&quot; layer." data-zh="每筆紀錄都被 embed。search_past_entries 工具依現在的主題拉回最相關的 top-k 個過去片刻 —— 「當下懂你」那一層。"></p></div>
+      <h3 data-en="Atomic facts" data-zh="原子事實"></h3>
+      <p data-en="Each exchange is split by an LLM into 5–10 single-topic facts, filed under eight fixed categories and embedded one by one. A three-minute turn about work, health and family no longer averages into one blurred vector — searching &quot;health&quot; matches only the health fact." data-zh="每次對話由 LLM 拆成 5–10 條單一主題的事實，歸進八個固定分類、各自 embed。講三分鐘同時提到工作、健康、家人，不再被平均成一組模糊的向量 —— 搜「健康」只會命中健康那一條。"></p></div>
     <div class="card"><div class="n" data-en="Layer 3 · LLM-condensed" data-zh="第 3 層 · LLM 濃縮"></div>
       <h3 data-en="Rolling profile" data-zh="滾動 profile"></h3>
       <p data-en="An LLM periodically condenses the journal into a short, fixed-size profile, injected into every conversation. This is what a stateless chatbot cannot do." data-zh="LLM 定期把日誌濃縮成一份簡短、固定大小的 profile，注入每次對話。這正是無狀態聊天機器人做不到的事。"></p></div>
@@ -237,7 +237,7 @@
       <div class="row3">
         <button class="node" data-node="log"><b>1 · Postgres log</b><small>services/entries.py</small></button>
         <span class="arr">+</span>
-        <button class="node" data-node="embed"><b>2 · embed → pgvector</b><small>services/recall.py</small></button>
+        <button class="node" data-node="embed"><b>2 · facts → pgvector</b><small>services/facts.py</small></button>
         <span class="arr">+</span>
         <button class="node" data-node="recondense"><b>3 · re-condense profile</b><small>services/profile.py</small></button>
       </div>
@@ -262,25 +262,25 @@
 → transcript:  &quot;Skipped my run again. Feels like I keep starting over.&quot;
 
    profile (layer 3):  goal — run 3x a week; mornings work best
-   recall  (layer 2):  a similar entry from three weeks ago
+   recall  (layer 2):  a fact from three weeks ago — shoes out the night before
 
 → answer:      &quot;Starting over still counts — you've strung good weeks
                 together before. Last time, laying your shoes out the
                 night before helped. Want to try that tonight?&quot;
 
-# the exchange is then saved to Postgres + embedded to pgvector,
-# and the profile re-condenses every few entries." data-zh="POST /transcribe   (音檔: today.webm)
+# the exchange is then saved to Postgres, split into atomic facts
+# and embedded, and the profile re-condenses every few entries." data-zh="POST /transcribe   (音檔: today.webm)
 
 → 逐字稿：   「又沒去跑步。感覺一直在重新開始。」
 
    profile（第 3 層）：目標 — 一週跑三次；早上最順
-   回想  （第 2 層）：三週前一筆相似的紀錄
+   回想  （第 2 層）：三週前的一條事實 — 前一晚先擺鞋子
 
 → 回答：      「重新開始也算數 —— 你以前也串起過好幾個好週。
                 上次你把鞋子前一晚先擺出來就有幫助。今晚要不要
                 也這樣試試？」
 
-# 接著這次對話會存進 Postgres + embed 進 pgvector，
+# 接著這次對話會存進 Postgres、拆成原子事實各自 embed，
 # profile 每幾筆就重新濃縮一次。"></pre>
 </div></section>
 
@@ -288,9 +288,10 @@
   <div class="sec-h" data-en="Design decisions" data-zh="設計決策"></div>
   <h2 data-en="Trade-offs, made on purpose" data-zh="刻意做的取捨"></h2>
   <ul class="clean">
+    <li data-en="<b>Atomic facts, not whole turns</b> — embedding a three-minute turn whole averages work, health and family into one vector, and a search for &quot;health&quot; gets diluted by the rest. Each exchange is split by an LLM into single-topic facts, categorised and embedded individually; at retrieval the model names the categories worth searching, so its judgement narrows the field alongside vector distance." data-zh="<b>存原子事實，不是整輪對話</b> —— 把三分鐘的一整段拿去 embedding，會把工作、健康、家人平均成一組向量，搜「健康」就被其他主題稀釋。現在每次對話由 LLM 拆成單一主題的事實，分類後各自 embedding；檢索時模型會指名該搜哪些分類，讓它的判斷和向量距離一起收斂範圍。"></li>
     <li data-en="<b>Three memory layers instead of one</b> — a stateless chatbot forgets, and stuffing the whole history into every prompt doesn't scale. Splitting memory keeps the prompt a fixed size no matter how large the journal grows." data-zh="<b>三層記憶，而不是一層</b> —— 無狀態聊天機器人會忘記，把整段歷史塞進每次 prompt 又不 scale。把記憶拆開，不管日誌多大，prompt 都維持固定大小。"></li>
     <li data-en="<b>LangChain on purpose</b> — agent, RAG, and memory in one industry-standard stack (create_agent + a dynamic prompt + a pgvector tool) instead of hand-rolling the tool-calling loop." data-zh="<b>刻意用 LangChain</b> —— agent、RAG、記憶一套業界標準搞定（create_agent + dynamic prompt + pgvector 工具），而不是自己手刻工具呼叫迴圈。"></li>
-    <li data-en="<b>One database for both</b> — Postgres holds the SQL journal and the pgvector embeddings side by side, so there's one store to run and back up, not two." data-zh="<b>一個資料庫兩用</b> —— Postgres 同時放 SQL 日誌和 pgvector 向量，只要顧一個儲存、備一份，而不是兩個。"></li>
+    <li data-en="<b>One database for both</b> — Postgres holds the SQL journal, the extracted facts, and their pgvector embeddings side by side, so there's one store to run and back up, not two." data-zh="<b>一個資料庫兩用</b> —— Postgres 同時放 SQL 日誌、抽出來的事實、以及它們的 pgvector 向量，只要顧一個儲存、備一份，而不是兩個。"></li>
     <li data-en="<b>Per-person by construction</b> — a verified Firebase uid scopes every entry, recall, and profile, and the public repo / demo use seed data only, with no keys committed." data-zh="<b>設計上就逐人隔離</b> —— 驗過的 Firebase uid 把每筆紀錄、回想、profile 都綁到本人；公開的 repo / demo 只用種子資料，且不提交任何 key。"></li>
   </ul>
 </div></section>
@@ -345,11 +346,11 @@
       en:["Profile injected — memory layer 3","Before every reply, your rolling profile (goals, habits, triggers, what helps) is prepended to the prompt. It's LLM-condensed and fixed-size, so Minerva always talks with a fresh sense of who you are — without re-reading your whole history."],
       zh:["注入 profile —— 記憶第 3 層","每次回覆前，把你的滾動 profile（目標、習慣、地雷、什麼有用）接到 prompt 前面。它由 LLM 濃縮、大小固定，所以Minerva總是帶著對你最新的理解說話，卻不用重讀整段歷史。"]},
     recall:{file:"app/services/recall.py",
-      en:["search_past_entries — memory layer 2","The one tool Minerva can call. Give it the current topic; it returns the most relevant past entries. This is the “understands you right now” layer — episodic memory, separate from the plain-SQL day/wins queries."],
-      zh:["search_past_entries —— 記憶第 2 層","Minerva唯一能呼叫的工具。給它現在的主題，它回傳最相關的過去紀錄。這是「當下懂你」那一層 —— 情節記憶，跟純 SQL 的日/成就查詢分開。"]},
+      en:["search_past_entries — memory layer 2","The one tool Minerva can call. Give it the current topic — and, optionally, which categories to look in — and it returns the most relevant atomic facts about you. The model choosing the categories is the point: its judgement narrows the field alongside vector distance, rather than leaving it to distance alone."],
+      zh:["search_past_entries —— 記憶第 2 層","Minerva唯一能呼叫的工具。給它現在的主題，還可以指定要搜哪些分類，它回傳關於你最相關的原子事實。讓模型自己挑分類是重點：它的判斷和向量距離一起收斂範圍，而不是全交給距離決定。"]},
     pgv:{file:"app/services/recall.py · PGVector",
-      en:["pgvector · top-k — what the tool does inside","Not a separate step — this runs inside the tool call above. Embeds the query and asks pgvector for the top-k closest past entries. Top-k is fixed, so the recalled slice stays constant no matter how big the journal grows."],
-      zh:["pgvector · top-k —— 工具內部在做的事","不是另外一步 —— 這是在上面那次工具呼叫「裡面」跑的。把 query 轉成向量，向 pgvector 要最接近的 top-k 筆過去紀錄。top-k 固定，所以不管日誌變多大，回想的那一片都維持固定大小。"]},
+      en:["pgvector · top-k — what the tool does inside","Not a separate step — this runs inside the tool call above. Embeds the query and asks pgvector for the top-k closest facts, filtered to you and to whichever categories the model asked for. Top-k is fixed, so the recalled slice stays constant no matter how big the journal grows."],
+      zh:["pgvector · top-k —— 工具內部在做的事","不是另外一步 —— 這是在上面那次工具呼叫「裡面」跑的。把 query 轉成向量，向 pgvector 要最接近的 top-k 條事實，並且只限你本人、只限模型指定的那幾個分類。top-k 固定，所以不管日誌變多大，回想的那一片都維持固定大小。"]},
     llm:{file:"app/services/chat_model.py",
       en:["gpt-5.3-chat-latest replies","With your profile, your saved mantras, and any recalled entries in hand, the model writes her reply — warm, and grounded in your real history instead of guessing. Claude is a supported alternative: set LLM_PROVIDER=anthropic."],
       zh:["gpt-5.3-chat-latest 回覆","手上有你的 profile、你收藏的 mantra 和回想到的紀錄後，模型寫出 Minerva 的回覆 —— 溫暖、扎在你真實的歷史上，而不是亂猜。Claude 是支援的替代選項，設 LLM_PROVIDER=anthropic 即可。"]},
@@ -360,11 +361,11 @@
       en:["Played aloud","The browser plays the mp3, so you hear Minerva answer. One exchange, done — and now it becomes memory."],
       zh:["唸出來播放","瀏覽器播放 mp3，你就聽到Minerva的回答。一次對話完成 —— 接著它變成記憶。"]},
     log:{file:"app/services/entries.py",
-      en:["Memory layer 1 · structured log","Every exchange is saved to Postgres as a journal entry — transcript, reply, plus mood / wins / themes Minerva pulls out. Plain SQL powers “recall this day” and “this month's wins”. No AI needed."],
-      zh:["記憶第 1 層 · 結構化日誌","每次對話都存進 Postgres 成一筆日誌 —— 逐字稿、回覆，加上Minerva抽出的心情 / 成就 / 主題。純 SQL 就能做「回顧這天」「這個月的成就」。不用 AI。"]},
-    embed:{file:"app/services/recall.py",
-      en:["Memory layer 2 · embed","The same entry is embedded and stored in pgvector, keyed by its SQL row id — so re-indexing overwrites, never duplicates. That's what makes it findable by future searches."],
-      zh:["記憶第 2 層 · embed","同一筆紀錄被 embed 後存進 pgvector，用它的 SQL row id 當 key —— 所以重新索引是覆蓋，不會重複。這讓它未來被搜尋得到。"]},
+      en:["Memory layer 1 · structured log","Every exchange is saved to Postgres verbatim — your words and hers. Plain SQL powers “recall this day”, and this stays the source of truth that layers 2 and 3 are derived from, so either can be rebuilt from it. No AI needed."],
+      zh:["記憶第 1 層 · 結構化日誌","每次對話原封不動存進 Postgres —— 你說的和她說的。純 SQL 就能「回顧這天」；這裡也是第 2、3 層衍生的真相來源，兩層都能從它重建。不用 AI。"]},
+    embed:{file:"app/services/facts.py",
+      en:["Memory layer 2 · atomic facts","One small structured-output call splits the exchange into 5–10 single-topic facts, each filed under one of eight fixed categories. Each fact is embedded on its own and keyed by its SQL row id, so re-indexing overwrites rather than duplicates. Splitting first is what keeps a search for one topic from being diluted by everything else said in the same breath."],
+      zh:["記憶第 2 層 · 原子事實","用一次小型的 structured output 呼叫，把這次對話拆成 5–10 條單一主題的事實，各自歸進八個固定分類之一。每條事實各自 embed，並用它的 SQL row id 當 key，所以重新索引是覆蓋而不是重複。先拆開，才能讓搜某個主題時不被同一口氣裡講的其他事稀釋。"]},
     recondense:{file:"app/services/profile.py",
       en:["Memory layer 3 · re-condense","Every few entries, an LLM folds recent journal into your profile — keeping what's still true, dropping one-off trivia. It's how Minerva steadily gets to know you while the profile stays a fixed size."],
       zh:["記憶第 3 層 · 重新濃縮","每幾筆紀錄，就由 LLM 把最近的日誌摺進你的 profile —— 留下還成立的、丟掉一次性瑣事。這就是Minerva持續認識你、而 profile 又維持固定大小的方法。"]}
