@@ -36,16 +36,19 @@ class _Doc:
         self.page_content = content
 
 
-def test_index_entry_adds_text_keyed_by_row_id(monkeypatch):
+def test_index_fact_adds_text_keyed_by_row_id(monkeypatch):
     store = _FakeStore()
-    monkeypatch.setattr(recall, "_store", lambda: store)
+    monkeypatch.setattr(recall, "_facts_store", lambda: store)
 
-    recall.index_entry(42, "I felt anxious before the interview", user_id="u9")
+    recall.index_fact(
+        42, "still went for a run while exhausted", user_id="u9",
+        category="wins",
+    )
 
     assert store.added == [
         (
-            ["I felt anxious before the interview"],
-            [{"entry_id": 42, "user_id": "u9"}],
+            ["still went for a run while exhausted"],
+            [{"fact_id": 42, "user_id": "u9", "category": "wins"}],
             ["42"],
         )
     ]
@@ -53,13 +56,31 @@ def test_index_entry_adds_text_keyed_by_row_id(monkeypatch):
 
 def test_recall_filters_by_user(monkeypatch):
     store = _FakeStore(docs=[_Doc("first"), _Doc("second")])
-    monkeypatch.setattr(recall, "_store", lambda: store)
+    monkeypatch.setattr(recall, "_facts_store", lambda: store)
 
     hits = recall.recall("interview nerves", user_id="u9", k=2)
 
     assert hits == ["first", "second"]
-    # The query is scoped to the user via a metadata filter.
+    # With no categories, the query is scoped to the user only.
     assert store.last == ("interview nerves", 2, {"user_id": "u9"})
+
+
+def test_recall_narrows_to_categories(monkeypatch):
+    store = _FakeStore(docs=[_Doc("ran anyway")])
+    monkeypatch.setattr(recall, "_facts_store", lambda: store)
+
+    hits = recall.recall(
+        "how do I cope", user_id="u9",
+        categories=["health & habits", "patterns"], k=5,
+    )
+
+    assert hits == ["ran anyway"]
+    # Category filter rides alongside the user filter (implicit AND).
+    assert store.last == (
+        "how do I cope",
+        5,
+        {"user_id": "u9", "category": {"$in": ["health & habits", "patterns"]}},
+    )
 
 
 def test_search_past_entries_tool_uses_the_runs_context(monkeypatch):
@@ -68,7 +89,9 @@ def test_search_past_entries_tool_uses_the_runs_context(monkeypatch):
     monkeypatch.setattr(
         recall,
         "recall",
-        lambda q, user_id=None, k=recall.TOP_K: seen.update(uid=user_id)
+        lambda q, user_id=None, categories=None, k=recall.TOP_K: seen.update(
+            uid=user_id, categories=categories
+        )
         or ["a win", "a worry"],
     )
     out = recall.search_past_entries.func("how am I doing", _Runtime("u-caller"))
@@ -77,17 +100,37 @@ def test_search_past_entries_tool_uses_the_runs_context(monkeypatch):
     assert seen["uid"] == "u-caller"
 
 
-def test_the_model_never_sees_the_runtime_argument():
-    """`runtime` is injected by LangChain, so it must stay out of the schema
-    the model is shown — otherwise the model would try to fill it in."""
-    assert list(recall.search_past_entries.args) == ["query"]
+def test_search_past_entries_passes_categories_through(monkeypatch):
+    """The model can narrow the search; the tool forwards its choice."""
+    seen = {}
+    monkeypatch.setattr(
+        recall,
+        "recall",
+        lambda q, user_id=None, categories=None, k=recall.TOP_K: seen.update(
+            categories=categories
+        )
+        or ["x"],
+    )
+    recall.search_past_entries.func(
+        "coping", _Runtime("u-caller"), categories=["patterns"]
+    )
+
+    assert seen["categories"] == ["patterns"]
+
+
+def test_the_model_sees_query_and_categories_but_not_runtime():
+    """`runtime` is injected by LangChain, so it must stay out of the schema the
+    model is shown; query and categories are the model's to fill."""
+    assert list(recall.search_past_entries.args) == ["query", "categories"]
 
 
 def test_search_past_entries_tool_handles_no_history(monkeypatch):
     monkeypatch.setattr(
-        recall, "recall", lambda q, user_id=None, k=recall.TOP_K: []
+        recall,
+        "recall",
+        lambda q, user_id=None, categories=None, k=recall.TOP_K: [],
     )
 
     out = recall.search_past_entries.func("anything", _Runtime("u-caller"))
 
-    assert out == "No related past entries found."
+    assert out == "No related past facts found."

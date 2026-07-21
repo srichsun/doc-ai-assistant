@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from app.api.deps import CurrentUid
 from app.core import clock
 from app.models import Entry
-from app.services import entries, strengths
+from app.services import entries, facts, strengths
 
 router = APIRouter(tags=["journal"])
 
@@ -19,9 +19,6 @@ def _entry_dict(e: Entry) -> dict:
     return {
         "id": e.id,
         "created_at": e.created_at.isoformat(),
-        "mood": e.mood,
-        "wins": e.wins,
-        "themes": e.themes,
         "transcript": e.transcript,
         "ai_reply": e.ai_reply,
     }
@@ -37,9 +34,22 @@ def entries_on_day(uid: CurrentUid, day: str | None = None):
 
 @router.get("/wins")
 def wins(uid: CurrentUid):
-    """Every day's wins, newest first — the day-by-day review screen."""
-    rows = entries.recent_wins(user_id=uid, limit=WINS_LIMIT)
-    return {"wins": [_entry_dict(r) for r in rows]}
+    """Every win, newest first — the day-by-day review screen.
+
+    Each win is one atomic fact now (category "wins"), but the shape the screen
+    consumes is unchanged: an item with `created_at` (to group by day) and
+    `wins` (the line to show)."""
+    rows = facts.recent_wins(user_id=uid, limit=WINS_LIMIT)
+    return {
+        "wins": [
+            {
+                "id": f.id,
+                "created_at": f.created_at.isoformat(),
+                "wins": f.text,
+            }
+            for f in rows
+        ]
+    }
 
 
 @router.get("/strengths")

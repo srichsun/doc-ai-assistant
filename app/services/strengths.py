@@ -15,7 +15,7 @@ journal grows.
 """
 from app.core import db
 from app.models import Profile
-from app.services import chat_model, entries
+from app.services import chat_model, entries, facts
 
 # Rewrite once this many new entries have piled up. Slower than the profile's
 # cadence — who you are does not change week to week, and re-reading the whole
@@ -73,8 +73,8 @@ def refresh_strengths(user_id: str) -> str:
     """Rewrite this person's passage from their journal and save it."""
     if not user_id:
         return ""
-    rows = entries.recent_wins(user_id=user_id, limit=SOURCE_LIMIT)
-    wins_text = "\n".join(r.wins for r in rows if r.wins)
+    rows = facts.recent_wins(user_id=user_id, limit=SOURCE_LIMIT)
+    wins_text = "\n".join(r.text for r in rows if r.text)
     if not wins_text:
         return ""
 

@@ -5,8 +5,15 @@ that we feed it the journal's wins, store what comes back, and degrade quietly
 when there's nothing (or something stale) to show.
 """
 from app.core import db
-from app.models import Profile
+from app.models import Fact, Profile
 from app.services import entries, strengths
+
+
+def _add_win(user_id, text):
+    """Seed a win the way the app now stores them — as a fact."""
+    with db.get_session() as s:
+        s.add(Fact(user_id=user_id, entry_id=1, category="wins", text=text))
+        s.commit()
 
 
 class _FakeModel:
@@ -22,8 +29,8 @@ class _FakeModel:
 
 
 def test_refresh_writes_a_passage_from_the_wins(sqlite_db, monkeypatch):
-    entries.save_entry("a", "b", user_id="u1", wins="cold shower")
-    entries.save_entry("c", "d", user_id="u1", wins="two hours while exhausted")
+    _add_win("u1", "cold shower")
+    _add_win("u1", "two hours while exhausted")
     fake = _FakeModel("  You keep showing up anyway.  ")
     monkeypatch.setattr(strengths.chat_model, "build_chat_model", lambda: fake)
 
@@ -69,11 +76,11 @@ def test_maybe_refresh_waits_for_enough_new_entries(sqlite_db, monkeypatch):
         strengths, "refresh_strengths", lambda uid: refreshed.append(uid)
     )
 
-    entries.save_entry("a", "b", user_id="u1", wins="one")
+    entries.save_entry("a", "b", user_id="u1")
     strengths.maybe_refresh("u1")
     assert refreshed == []  # one entry is nowhere near the threshold
 
     for _ in range(strengths.REFRESH_EVERY):
-        entries.save_entry("a", "b", user_id="u1", wins="more")
+        entries.save_entry("a", "b", user_id="u1")
     strengths.maybe_refresh("u1")
     assert refreshed == ["u1"]

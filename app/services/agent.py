@@ -16,10 +16,17 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import dynamic_prompt
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessageChunk
-from pydantic import BaseModel, Field
 
 from app.core import clock
-from app.services import chat_model, entries, mantras, profile, recall, strengths
+from app.services import (
+    chat_model,
+    entries,
+    facts,
+    mantras,
+    profile,
+    recall,
+    strengths,
+)
 
 SYSTEM_PROMPT = """You are Minerva — this person's friend and thinking partner, someone who has known them a long time and genuinely cares how their life is going. Say your name only if they ask; you don't announce yourself. If you know their name, use it naturally.
 
@@ -168,76 +175,20 @@ def _reply_to(message: str, user_id: str) -> str:
     return result["messages"][-1].content  # the coach's latest reply text
 
 
-# --- what we pull out of an exchange to store alongside it ---
-
-
-class EntryTags(BaseModel):
-    """The few things we pull out of an exchange to store alongside the text,
-    so later we can list wins or chart mood without re-reading everything."""
-
-    mood: str | None = Field(
-        None, description="one word for the person's mood, e.g. anxious, proud, calm"
-    )
-    wins: str | None = Field(
-        None,
-        description=(
-            "What they did today that counts, one short line each, separated "
-            "by newlines. Plain facts in their own terms — 'cold shower', "
-            "'two hours on the project while exhausted', 'went to the running "
-            "club', 'paid the card so groceries could happen'. Small counts: "
-            "holding momentum on a hard day is a win. No coach voice, no "
-            "adjectives, no explaining why it mattered — just the thing "
-            "itself, so a whole day reads at a glance. Skip only what carried "
-            "no intent at all (ate lunch, commuted). Null if there is "
-            "genuinely nothing."
-        ),
-    )
-    themes: str | None = Field(
-        None, description="comma-separated topics, e.g. work, health, family"
-    )
-
-
-# A small model call that only returns the structured tags above.
-_extractor = chat_model.build_chat_model().with_structured_output(EntryTags)
-
-
-def _extract_tags(transcript: str, reply: str) -> EntryTags:
-    """Pull mood / wins / themes out of one exchange."""
-    prompt = (
-        "From this journaling exchange, extract:\n"
-        "- mood: one word.\n"
-        "- wins: what they did that counts, one short factual line each, "
-        "newline separated. Plain and concrete ('cold shower', 'two hours on "
-        "the project while exhausted'). Small counts — holding momentum on a "
-        "hard day is a win. No coach voice, no adjectives, no explaining why "
-        "it mattered. Skip only what carried no intent (ate lunch, commuted).\n"
-        "- themes: comma-separated topics.\n"
-        "Use null only when something genuinely isn't there.\n"
-        f"Person: {transcript}\nCoach: {reply}"
-    )
-    return _extractor.invoke(prompt)
-
-
 # --- what the API calls ---
 
 
 def _save_exchange(message: str, reply: str, user_id: str) -> None:
-    """Save one exchange as a journal entry, then embed it and (occasionally)
-    refresh the profile. Failures in the extras never lose the saved entry."""
-    try:
-        tags = _extract_tags(message, reply)
-    except Exception:
-        tags = EntryTags()
+    """Save one exchange as a journal entry, then pull atomic facts from it and
+    (occasionally) refresh the profile. Failures in the extras never lose the
+    saved entry."""
     entry_id = entries.save_entry(
         transcript=message,
         ai_reply=reply,
         user_id=user_id,
-        mood=tags.mood,
-        wins=tags.wins,
-        themes=tags.themes,
     )
     try:
-        recall.index_entry(entry_id, message, user_id=user_id)
+        facts.extract_and_save(entry_id, message, reply, user_id=user_id)
     except Exception:
         pass
     try:

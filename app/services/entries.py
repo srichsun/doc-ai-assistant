@@ -1,9 +1,9 @@
 """Save and read journal entries — the plain-SQL heart of the app.
 
 Every query is scoped to one person (their Firebase uid), so accounts never
-see each other's journal. Recalling a day or listing this month's wins is just
-a filtered query by date/column; no AI needed. (Semantic "find similar past
-moments" lives in recall.py with pgvector.)
+see each other's journal. Recalling a day is just a filtered query by date; no
+AI needed. (Atomic facts and the wins list live in facts.py; semantic "find
+similar past moments" lives in recall.py with pgvector.)
 """
 from datetime import date
 
@@ -17,20 +17,18 @@ def save_entry(
     transcript: str,
     ai_reply: str,
     user_id: str,
-    mood: str | None = None,
-    wins: str | None = None,
-    themes: str | None = None,
     note: str | None = None,
 ) -> int:
-    """Store one conversation turn as a journal entry; return its new id."""
+    """Store one conversation turn as a journal entry; return its new id.
+
+    The things pulled out of an exchange (wins and the like) are no longer
+    stored on the entry — they live as atomic facts (see app.services.facts).
+    """
     with db.get_session() as s:
         entry = Entry(
             transcript=transcript,
             ai_reply=ai_reply,
             user_id=user_id,
-            mood=mood,
-            wins=wins,
-            themes=themes,
             note=note,
         )
         s.add(entry)
@@ -71,19 +69,3 @@ def count_entries(user_id: str) -> int:
     with db.get_session() as s:
         stmt = select(func.count()).select_from(Entry).where(Entry.user_id == user_id)
         return s.scalar(stmt) or 0
-
-
-def recent_wins(user_id: str, limit: int = 20) -> list[Entry]:
-    """One person's most recent entries that recorded a win, newest first."""
-    with db.get_session() as s:
-        stmt = (
-            select(Entry)
-            .where(
-                Entry.user_id == user_id,
-                Entry.wins.is_not(None),
-                Entry.wins != "",
-            )
-            .order_by(Entry.created_at.desc())
-            .limit(limit)
-        )
-        return list(s.scalars(stmt))

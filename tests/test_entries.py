@@ -10,29 +10,22 @@ UID = "u1"
 
 
 def test_save_and_read_back(sqlite_db):
-    new_id = entries.save_entry(
-        "I ran 5k today", "That's a real win!", UID, mood="proud", wins="ran 5k"
-    )
+    new_id = entries.save_entry("I ran 5k today", "That's a real win!", UID)
     assert isinstance(new_id, int)
 
     todays = entries.entries_on(datetime.now(timezone.utc).date(), UID)
     assert len(todays) == 1
     assert todays[0].transcript == "I ran 5k today"
-    assert todays[0].mood == "proud"
-
-
-def test_recent_wins_only_returns_entries_with_wins(sqlite_db):
-    entries.save_entry("nothing much happened", "that's okay", UID, wins=None)
-    entries.save_entry("finished the report", "great job", UID, wins="finished report")
-
-    wins = entries.recent_wins(UID)
-    assert len(wins) == 1
-    assert wins[0].wins == "finished report"
+    assert todays[0].ai_reply == "That's a real win!"
 
 
 def test_entries_are_scoped_to_one_person(sqlite_db):
-    entries.save_entry("mine", "reply", UID, wins="mine")
-    entries.save_entry("theirs", "reply", "u2", wins="theirs")
+    entries.save_entry("mine", "reply", UID)
+    entries.save_entry("theirs", "reply", "u2")
 
-    assert [e.wins for e in entries.recent_wins(UID)] == ["mine"]
-    assert [e.wins for e in entries.recent_wins("u2")] == ["theirs"]
+    assert [e.transcript for e in entries.entries_on(
+        datetime.now(timezone.utc).date(), UID
+    )] == ["mine"]
+    assert [e.transcript for e in entries.entries_on(
+        datetime.now(timezone.utc).date(), "u2"
+    )] == ["theirs"]

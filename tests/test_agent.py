@@ -78,18 +78,15 @@ def test_history_is_empty_when_the_journal_cannot_be_read(monkeypatch):
 
 def test_reply_and_save_saves_a_journal_entry(sqlite_db, monkeypatch):
     monkeypatch.setattr(agent, "_agent", _coach_with(["proud of you"]))
-    # Skip the real extraction LLM call; return fixed tags.
+    # Skip the real fact-extraction LLM + vector store; just record the call.
+    extracted = []
     monkeypatch.setattr(
-        agent,
-        "_extract_tags",
-        lambda t, r: agent.EntryTags(mood="proud", wins="ran 5k", themes="health"),
-    )
-    # Capture the semantic index call instead of hitting the real vector store.
-    indexed = []
-    monkeypatch.setattr(
-        agent.recall,
-        "index_entry",
-        lambda eid, text, user_id=None: indexed.append((eid, text, user_id)),
+        agent.facts,
+        "extract_and_save",
+        lambda eid, transcript, reply, user_id=None: extracted.append(
+            (eid, transcript, reply, user_id)
+        )
+        or [],
     )
 
     result = agent.reply_and_save("I ran 5k today", user_id="u1")
@@ -99,8 +96,6 @@ def test_reply_and_save_saves_a_journal_entry(sqlite_db, monkeypatch):
     saved = entries.entries_on(clock.today(), user_id="u1")
     assert len(saved) == 1
     assert saved[0].transcript == "I ran 5k today"
-    assert saved[0].mood == "proud"
-    assert saved[0].wins == "ran 5k"
 
-    # ...and indexed for semantic recall, keyed by the saved row id and user.
-    assert indexed == [(saved[0].id, "I ran 5k today", "u1")]
+    # ...and handed to fact extraction, keyed by the saved row id and user.
+    assert extracted == [(saved[0].id, "I ran 5k today", "proud of you", "u1")]

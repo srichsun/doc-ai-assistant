@@ -1,8 +1,9 @@
 """One journal entry — a single conversation turn.
 
-What the user said, what the coach replied, plus a few things the coach pulled
-out (mood, wins, themes) so we can later list "this month's wins" or chart mood
-without re-reading every entry.
+What the user said and what the coach replied. The things once pulled out onto
+this row (mood, wins, themes) now live as atomic facts (see app.models.fact and
+app.services.facts); those columns were retired from the model, though the
+physical DB columns stay until an Alembic migration drops them.
 """
 from datetime import datetime
 
@@ -24,9 +25,4 @@ class Entry(Base):
     user_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     transcript: Mapped[str] = mapped_column(Text)  # what the user said
     ai_reply: Mapped[str] = mapped_column(Text)  # what the coach replied
-    # The coach fills these in; all optional. wins/themes are kept as plain
-    # text (comma-separated) to stay simple and DB-portable.
-    mood: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    wins: Mapped[str | None] = mapped_column(Text, nullable=True)
-    themes: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
