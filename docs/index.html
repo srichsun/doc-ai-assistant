@@ -169,7 +169,7 @@
       <p data-en="Every exchange saved verbatim as a journal entry — transcript and reply. Powers &quot;recall this day&quot; with plain SQL, and stays the source of truth everything else is derived from. No AI." data-zh="每次對話原封不動存成一筆日誌 —— 逐字稿和回覆。用純 SQL 就能「回顧這天」，也是其他一切衍生資料的真相來源。不用 AI。"></p></div>
     <div class="card"><div class="n" data-en="Layer 2 · pgvector" data-zh="第 2 層 · pgvector"></div>
       <h3 data-en="Atomic facts" data-zh="原子事實"></h3>
-      <p data-en="Each exchange is split by an LLM into 5–10 single-topic facts, filed under eight fixed categories and embedded one by one. A three-minute turn about work, health and family no longer averages into one blurred vector — searching &quot;health&quot; matches only the health fact." data-zh="每次對話由 LLM 拆成 5–10 條單一主題的事實，歸進八個固定分類、各自 embed。講三分鐘同時提到工作、健康、家人，不再被平均成一組模糊的向量 —— 搜「健康」只會命中健康那一條。"></p></div>
+      <p data-en="Each exchange is split by an LLM into 5–10 single-topic facts, filed under nine fixed categories and embedded one by one. A three-minute turn about work, health and family no longer averages into one blurred vector — searching &quot;health&quot; matches only the health fact." data-zh="每次對話由 LLM 拆成 5–10 條單一主題的事實，歸進九個固定分類、各自 embed。講三分鐘同時提到工作、健康、家人，不再被平均成一組模糊的向量 —— 搜「健康」只會命中健康那一條。"></p></div>
     <div class="card"><div class="n" data-en="Layer 3 · LLM-condensed" data-zh="第 3 層 · LLM 濃縮"></div>
       <h3 data-en="Rolling profile" data-zh="滾動 profile"></h3>
       <p data-en="An LLM periodically condenses the journal into a short, fixed-size profile, injected into every conversation. This is what a stateless chatbot cannot do." data-zh="LLM 定期把日誌濃縮成一份簡短、固定大小的 profile，注入每次對話。這正是無狀態聊天機器人做不到的事。"></p></div>
@@ -364,8 +364,8 @@
       en:["Memory layer 1 · structured log","Every exchange is saved to Postgres verbatim — your words and hers. Plain SQL powers “recall this day”, and this stays the source of truth that layers 2 and 3 are derived from, so either can be rebuilt from it. No AI needed."],
       zh:["記憶第 1 層 · 結構化日誌","每次對話原封不動存進 Postgres —— 你說的和她說的。純 SQL 就能「回顧這天」；這裡也是第 2、3 層衍生的真相來源，兩層都能從它重建。不用 AI。"]},
     embed:{file:"app/services/facts.py",
-      en:["Memory layer 2 · atomic facts","One small structured-output call splits the exchange into 5–10 single-topic facts, each filed under one of eight fixed categories. Each fact is embedded on its own and keyed by its SQL row id, so re-indexing overwrites rather than duplicates. Splitting first is what keeps a search for one topic from being diluted by everything else said in the same breath."],
-      zh:["記憶第 2 層 · 原子事實","用一次小型的 structured output 呼叫，把這次對話拆成 5–10 條單一主題的事實，各自歸進八個固定分類之一。每條事實各自 embed，並用它的 SQL row id 當 key，所以重新索引是覆蓋而不是重複。先拆開，才能讓搜某個主題時不被同一口氣裡講的其他事稀釋。"]},
+      en:["Memory layer 2 · atomic facts","One small structured-output call splits the exchange into 5–10 single-topic facts, each filed under one of nine fixed categories — including &quot;wins&quot;, so she can search for what someone actually did on the days they have forgotten. Each fact is embedded on its own and keyed by its SQL row id, so re-indexing overwrites rather than duplicates. Splitting first is what keeps a search for one topic from being diluted by everything else said in the same breath."],
+      zh:["記憶第 2 層 · 原子事實","用一次小型的 structured output 呼叫，把這次對話拆成 5–10 條單一主題的事實，各自歸進九個固定分類之一 —— 其中包含「wins」，所以在對方忘記自己做到過什麼的日子，她能直接搜出來。每條事實各自 embed，並用它的 SQL row id 當 key，所以重新索引是覆蓋而不是重複。先拆開，才能讓搜某個主題時不被同一口氣裡講的其他事稀釋。"]},
     recondense:{file:"app/services/profile.py",
       en:["Memory layer 3 · re-condense","Every few entries, an LLM folds recent journal into your profile — keeping what's still true, dropping one-off trivia. It's how Minerva steadily gets to know you while the profile stays a fixed size."],
       zh:["記憶第 3 層 · 重新濃縮","每幾筆紀錄，就由 LLM 把最近的日誌摺進你的 profile —— 留下還成立的、丟掉一次性瑣事。這就是Minerva持續認識你、而 profile 又維持固定大小的方法。"]}

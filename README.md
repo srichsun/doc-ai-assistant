@@ -47,9 +47,9 @@ averaging all three into a single 1536-dimension vector means a search for
 day that felt similar" rather than "find the relevant moment".
 
 So each exchange is now split by an LLM into 5–10 single-topic facts, each filed
-under one of eight fixed categories (`about me`, `preferences`, `people`,
+under one of nine fixed categories (`about me`, `preferences`, `people`,
 `work & career`, `goals & aspirations`, `health & habits`, `beliefs`,
-`patterns`) and embedded on its own. The split is a rewrite, not a cut: "work
+`patterns`, `wins`) and embedded on its own. The split is a rewrite, not a cut: "work
 stalled but I ran anyway" becomes a standalone "keeps running even when
 exhausted", which still makes sense when it is retrieved months later with no
 surrounding context. At retrieval, similarity search runs *alongside* the

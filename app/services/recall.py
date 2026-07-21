@@ -100,9 +100,10 @@ def search_past_entries(
 
     Optionally narrow the search to one or more categories (omit to search all):
     "about me", "preferences", "people", "work & career", "goals & aspirations",
-    "health & habits", "beliefs", "patterns". Pick the categories that fit the
-    topic — e.g. ["health & habits", "patterns"] when they're talking about how
-    they cope with stress."""
+    "health & habits", "beliefs", "patterns", "wins". Pick the categories that
+    fit the topic — e.g. ["health & habits", "patterns"] when they're talking
+    about how they cope with stress, or ["wins"] when they have forgotten what
+    they are capable of and need their own record shown back to them."""
     # `runtime` is injected by LangChain, not chosen by the model — it never
     # appears in the tool schema the model sees. Its context is the caller's uid.
     hits = recall(query, user_id=runtime.context, categories=categories)

@@ -16,9 +16,12 @@ from app.core import db
 from app.models import Fact
 from app.services import chat_model, recall
 
-# The eight "who this person is" categories. Fixed on purpose: a bounded set
-# keeps recall filters and the coach's category choices predictable. Order is
-# the order the model sees them.
+# The eight "who this person is" categories, plus `wins` — what they actually
+# did that counts. Wins earn their own category because "remind me what I've
+# done" is a different question from "what am I like", and she needs to be able
+# to search for it directly on the days someone has forgotten. Fixed on purpose:
+# a bounded set keeps recall filters and the coach's category choices
+# predictable. Order is the order the model sees them.
 CATEGORIES = (
     "about me",
     "preferences",
@@ -28,6 +31,7 @@ CATEGORIES = (
     "health & habits",
     "beliefs",
     "patterns",
+    "wins",
 )
 
 
@@ -43,6 +47,7 @@ class _Fact(BaseModel):
         "health & habits",
         "beliefs",
         "patterns",
+        "wins",
     ] = Field(description="which category this fact belongs to")
     text: str = Field(description="the single-topic statement, in plain words")
 
@@ -70,6 +75,10 @@ _EXTRACT_PROMPT = (
     "- health & habits: body, sleep, exercise, routines, coping.\n"
     "- beliefs: values and convictions they hold.\n"
     "- patterns: recurring behaviour, especially how they act under stress.\n"
+    "- wins: something they actually did that counts, stated plainly ('cold "
+    "shower', 'two hours on the project while exhausted', 'made a call they "
+    "were afraid of'). Small counts — holding momentum on a hard day is a win. "
+    "No praise, no adjectives, no explaining why it mattered.\n"
     "Keep each fact to one topic — never fold work and health into one line. "
     "Only state what's actually here; invent nothing. Return an empty list if "
     "there is genuinely nothing.\n\n"
