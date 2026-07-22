@@ -30,31 +30,33 @@ def test_a_second_save_rewrites_the_same_day(sqlite_db):
     assert entries.today_entry(UID).content == "what I actually meant"
 
 
-def test_the_first_write_is_free_then_edits_are_counted(sqlite_db):
-    entries.save_today("one", UID)
-    assert entries.today_entry(UID).edit_count == 0
+def test_writing_as_many_times_as_the_day_needs(sqlite_db):
+    """A day gets written in passes. Charging for that would punish keeping up
+    with it, and storing text costs nothing."""
+    for i in range(entries.ANALYSIS_LIMIT + 5):
+        entries.save_today(f"pass {i}", UID)
 
-    entries.save_today("two", UID)
-    assert entries.today_entry(UID).edit_count == 1
-
-
-def test_running_out_of_edits(sqlite_db):
-    entries.save_today("first draft", UID)
-    for i in range(entries.EDIT_LIMIT):
-        entries.save_today(f"rewrite {i}", UID)
-
-    with pytest.raises(entries.EditLimitReached):
-        entries.save_today("one more", UID)
-
-    # The last accepted rewrite is what stands.
-    assert entries.today_entry(UID).content == f"rewrite {entries.EDIT_LIMIT - 1}"
+    assert entries.today_entry(UID).content == f"pass {entries.ANALYSIS_LIMIT + 4}"
+    assert entries.today_entry(UID).analysis_count == 0
 
 
-def test_re_analysing_spends_the_same_allowance_as_editing(sqlite_db):
+def test_running_out_of_analyses(sqlite_db):
     entry = entries.save_today("today", UID)
-    entries.spend_edit(entry.id)
+    for _ in range(entries.ANALYSIS_LIMIT):
+        entries.spend_analysis(entry.id)
 
-    assert entries.today_entry(UID).edit_count == 1
+    with pytest.raises(entries.AnalysisLimitReached):
+        entries.spend_analysis(entry.id)
+
+
+def test_writing_again_after_the_analyses_are_gone(sqlite_db):
+    """Out of analyses is not out of journal — the day can still be added to."""
+    entry = entries.save_today("today", UID)
+    for _ in range(entries.ANALYSIS_LIMIT):
+        entries.spend_analysis(entry.id)
+
+    entries.save_today("one more thought", UID)
+    assert entries.today_entry(UID).content == "one more thought"
 
 
 def test_energy_survives_an_edit_that_does_not_set_it(sqlite_db):

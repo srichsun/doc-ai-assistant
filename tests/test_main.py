@@ -71,7 +71,7 @@ def test_entries_endpoint_returns_the_recent_days(sqlite_db):
     assert len(body["entries"]) == 1
     assert body["entries"][0]["content"] == "felt good today"
     assert body["entries"][0]["energy"] == 8
-    assert body["entries"][0]["edits_left"] == entries.EDIT_LIMIT
+    assert body["entries"][0]["analyses_left"] == entries.ANALYSIS_LIMIT
 
 
 def test_entries_are_scoped_to_the_signed_in_user(sqlite_db):

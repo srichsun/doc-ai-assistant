@@ -34,10 +34,11 @@ class Entry(Base):
     # Self-rated energy, 1-10, filled in after writing. Nullable because an
     # entry can be saved before the person has rated the day.
     energy: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Edits and re-runs of the analysis share one allowance (see
-    # app.services.entries.EDIT_LIMIT), so a day settles instead of being
-    # endlessly reworked.
-    edit_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # How many times the day has been analysed (see
+    # app.services.entries.ANALYSIS_LIMIT). Writing is free and unmetered — a
+    # day gets added to all day long. Analysis is the part that costs a model
+    # call, and the part that should settle rather than be reworked forever.
+    analysis_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # When the facts for this day were last extracted; None means never.
     analyzed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

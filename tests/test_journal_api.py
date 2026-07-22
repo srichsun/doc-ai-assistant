@@ -1,8 +1,9 @@
 """Journal route tests — writing today, analysing it, reading days back.
 
 Fact extraction is an LLM call, so it's faked; what's checked here is the glue
-and the boundaries: that only today is writable, that the allowance runs out,
-and that analysing twice leaves one reading of the day rather than two.
+and the boundaries: that only today is writable, that writing is never
+refused, that the analyses run out, and that analysing twice leaves one
+reading of the day rather than two.
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -54,12 +55,13 @@ def test_writing_today(sqlite_db):
     assert body["content"] == "long day"
     assert body["energy"] == 6
     assert body["date"] == clock.today().isoformat()
-    assert body["edits_left"] == entries.EDIT_LIMIT
+    assert body["analyses_left"] == entries.ANALYSIS_LIMIT
     assert body["analyzed"] is False
 
 
 def test_a_blank_day_is_rejected(sqlite_db):
-    """An empty entry would spend an edit and give the analysis nothing."""
+    """A blank day would show up on the chart as a written day and give the
+    analysis nothing to read."""
     for blank in ("", "   ", "\n\t"):
         assert client.post("/entries", json={"content": blank}).status_code == 422
     assert entries.today_entry(UID) is None
@@ -70,15 +72,24 @@ def test_energy_outside_one_to_ten_is_rejected(sqlite_db):
     assert client.post("/entries", json={"content": "x", "energy": 11}).status_code == 422
 
 
-def test_the_allowance_runs_out(sqlite_db):
-    client.post("/entries", json={"content": "first"})
-    for i in range(entries.EDIT_LIMIT):
-        resp = client.post("/entries", json={"content": f"rewrite {i}"})
+def test_writing_is_never_refused(sqlite_db):
+    for i in range(entries.ANALYSIS_LIMIT + 3):
+        resp = client.post("/entries", json={"content": f"pass {i}"})
         assert resp.status_code == 200
-        assert resp.json()["edits_left"] == entries.EDIT_LIMIT - (i + 1)
+        assert resp.json()["analyses_left"] == entries.ANALYSIS_LIMIT
 
-    spent = client.post("/entries", json={"content": "one more"})
-    assert spent.status_code == 409
+
+def test_the_analyses_run_out(sqlite_db, monkeypatch):
+    _fake_extraction(monkeypatch, ("wins", "kept going"))
+    entry_id = client.post("/entries", json={"content": "a day"}).json()["id"]
+
+    for i in range(entries.ANALYSIS_LIMIT):
+        body = client.post(f"/entries/{entry_id}/analyze").json()
+        assert body["analyses_left"] == entries.ANALYSIS_LIMIT - (i + 1)
+
+    assert client.post(f"/entries/{entry_id}/analyze").status_code == 409
+    # ...but the day can still be written to.
+    assert client.post("/entries", json={"content": "later"}).status_code == 200
 
 
 def test_analysis_extracts_the_days_facts(sqlite_db, monkeypatch):
@@ -95,8 +106,7 @@ def test_analysis_extracts_the_days_facts(sqlite_db, monkeypatch):
     assert body["analyzed"] is True
     assert body["wins"] == ["went for a run while exhausted"]
     assert body["gratitude"] == ["a friend read my CV"]
-    # Analysing costs the same as an edit.
-    assert body["edits_left"] == entries.EDIT_LIMIT - 1
+    assert body["analyses_left"] == entries.ANALYSIS_LIMIT - 1
 
 
 def test_re_analysing_replaces_rather_than_doubles(sqlite_db, monkeypatch):

@@ -15,14 +15,16 @@ from sqlalchemy import func, select
 from app.core import clock, db
 from app.models import Entry
 
-# How many times a day may be reworked after it was first written. Editing the
-# text and re-running the analysis draw on the same allowance: the point is that
-# a day settles, not that one kind of change is cheaper than the other.
-EDIT_LIMIT = 3
+# How many times a day may be analysed. Writing is deliberately not counted:
+# a day is often written in several passes — a note at lunch, the rest at
+# midnight — and metering that would punish keeping up with your own day.
+# Analysis is what costs a model call, and what should settle once the day is
+# actually over.
+ANALYSIS_LIMIT = 3
 
 
-class EditLimitReached(Exception):
-    """Raised when today's allowance of edits and re-analyses is used up."""
+class AnalysisLimitReached(Exception):
+    """Raised when today's allowance of analyses is used up."""
 
 
 def today_entry(user_id: str) -> Entry | None:
@@ -52,8 +54,8 @@ def entry_on_id(entry_id: int, user_id: str) -> Entry | None:
 def save_today(content: str, user_id: str, energy: int | None = None) -> Entry:
     """Write or rewrite today's entry; return it.
 
-    The first write of the day is free. Every rewrite after that spends one of
-    EDIT_LIMIT, and raises EditLimitReached once they're gone.
+    Unmetered on purpose — see ANALYSIS_LIMIT. Come back as many times as the
+    day needs.
     """
     day = clock.today()
     with db.get_session() as s:
@@ -63,9 +65,6 @@ def save_today(content: str, user_id: str, energy: int | None = None) -> Entry:
             entry = Entry(user_id=user_id, entry_date=day, content=content, energy=energy)
             s.add(entry)
         else:
-            if entry.edit_count >= EDIT_LIMIT:
-                raise EditLimitReached
-            entry.edit_count += 1
             entry.content = content
             if energy is not None:
                 entry.energy = energy
@@ -73,18 +72,15 @@ def save_today(content: str, user_id: str, energy: int | None = None) -> Entry:
         return entry
 
 
-def spend_edit(entry_id: int) -> Entry:
-    """Charge one of the day's allowance without changing the text.
-
-    Re-running the analysis costs the same as an edit — see EDIT_LIMIT.
-    """
+def spend_analysis(entry_id: int) -> Entry:
+    """Charge one of the day's analyses, or refuse once they're gone."""
     with db.get_session() as s:
         entry = s.get(Entry, entry_id)
         if entry is None:
             raise LookupError(f"no entry {entry_id}")
-        if entry.edit_count >= EDIT_LIMIT:
-            raise EditLimitReached
-        entry.edit_count += 1
+        if entry.analysis_count >= ANALYSIS_LIMIT:
+            raise AnalysisLimitReached
+        entry.analysis_count += 1
         s.commit()
         return entry
 

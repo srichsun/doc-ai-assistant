@@ -27,7 +27,7 @@ def _entry_dict(e: Entry, shown: list | None = None) -> dict:
         "date": e.entry_date.isoformat(),
         "content": e.content,
         "energy": e.energy,
-        "edits_left": max(0, entries.EDIT_LIMIT - e.edit_count),
+        "analyses_left": max(0, entries.ANALYSIS_LIMIT - e.analysis_count),
         "analyzed": e.analyzed_at is not None,
         "wins": [f.text for f in shown if f.category == "wins"],
         "gratitude": [f.text for f in shown if f.category == "gratitude"],
@@ -54,15 +54,9 @@ def entries_in_range(uid: CurrentUid, days: int = 7):
 
 @router.post("/entries")
 def write_today(req: EntryWrite, uid: CurrentUid):
-    """Write or rewrite today's entry.
-
-    The first write of the day is free; each rewrite after that spends one of
-    the day's allowance. 409 once it's gone — the day is finished.
-    """
-    try:
-        row = entries.save_today(req.content, user_id=uid, energy=req.energy)
-    except entries.EditLimitReached:
-        raise HTTPException(status_code=409, detail="no edits left for today")
+    """Write or rewrite today's entry. Unmetered — a day is often written in
+    passes, and charging for that would punish keeping up with it."""
+    row = entries.save_today(req.content, user_id=uid, energy=req.energy)
     return _entry_dict(row)
 
 
@@ -72,15 +66,15 @@ def analyze(entry_id: int, uid: CurrentUid):
 
     This is the only thing in the app that grows the memory, and it only runs
     when the person asks for it. Re-analysing replaces the day's facts rather
-    than adding a second reading of the same day, and costs the same as an edit.
+    than adding a second reading, and spends one of the day's analyses.
     """
     row = entries.entry_on_id(entry_id, user_id=uid)
     if row is None:
         raise HTTPException(status_code=404, detail="no such entry")
     try:
-        entries.spend_edit(row.id)
-    except entries.EditLimitReached:
-        raise HTTPException(status_code=409, detail="no edits left for today")
+        entries.spend_analysis(row.id)
+    except entries.AnalysisLimitReached:
+        raise HTTPException(status_code=409, detail="no analyses left today")
 
     facts.replace_for_entry(row.id, row.content, user_id=uid)
     entries.mark_analyzed(row.id)
