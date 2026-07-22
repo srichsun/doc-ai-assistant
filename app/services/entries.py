@@ -37,6 +37,18 @@ def entry_on(day: date, user_id: str) -> Entry | None:
         return s.scalars(stmt).first()
 
 
+def entry_on_id(entry_id: int, user_id: str) -> Entry | None:
+    """One entry by id, but only if it belongs to this person.
+
+    Scoping the lookup by uid rather than checking ownership afterwards means a
+    guessed id reads as "no such entry" — there is no branch where someone
+    else's day is loaded and then rejected.
+    """
+    with db.get_session() as s:
+        stmt = select(Entry).where(Entry.id == entry_id, Entry.user_id == user_id)
+        return s.scalars(stmt).first()
+
+
 def save_today(content: str, user_id: str, energy: int | None = None) -> Entry:
     """Write or rewrite today's entry; return it.
 

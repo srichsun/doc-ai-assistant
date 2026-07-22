@@ -104,6 +104,59 @@ def extract_and_save(
     return fact_ids
 
 
+def replace_for_entry(entry_id: int, content: str, user_id: str) -> list[int]:
+    """Re-extract one day's facts, discarding whatever was there before.
+
+    Analysing the same day twice must not leave both readings in memory: the
+    old facts are deleted from SQL and from the vector store first, so what the
+    coach knows about that day is always the latest reading of it.
+    """
+    forget_entry(entry_id, user_id)
+    return extract_and_save(entry_id, content, user_id)
+
+
+def forget_entry(entry_id: int, user_id: str) -> None:
+    """Delete one day's facts from both stores."""
+    with db.get_session() as s:
+        stmt = select(Fact).where(Fact.user_id == user_id, Fact.entry_id == entry_id)
+        rows = list(s.scalars(stmt))
+        if not rows:
+            return
+        ids = [r.id for r in rows]
+        for row in rows:
+            s.delete(row)
+        s.commit()
+    try:
+        recall.forget_facts(ids)
+    except Exception:
+        # The SQL rows are gone either way; a stale vector is recoverable by
+        # re-indexing, but losing the delete of the rows would not be.
+        pass
+
+
+def for_entries(
+    entry_ids: list[int], user_id: str, categories: tuple[str, ...] | None = None
+) -> dict[int, list[Fact]]:
+    """The stored facts for these days, grouped by entry id.
+
+    The record screen reads wins and gratitude back this way — plain SQL by id,
+    no embeddings involved. Semantic search is for "find me something like
+    this"; showing a day's own facts is just a lookup.
+    """
+    if not entry_ids:
+        return {}
+    with db.get_session() as s:
+        stmt = select(Fact).where(
+            Fact.user_id == user_id, Fact.entry_id.in_(entry_ids)
+        )
+        if categories:
+            stmt = stmt.where(Fact.category.in_(categories))
+        grouped: dict[int, list[Fact]] = {}
+        for row in s.scalars(stmt.order_by(Fact.id)):
+            grouped.setdefault(row.entry_id, []).append(row)
+        return grouped
+
+
 def existing_fact_entry_ids(user_id: str) -> set[int]:
     """The entry ids that already have facts — so a backfill can skip them."""
     with db.get_session() as s:
