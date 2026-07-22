@@ -1,15 +1,15 @@
-# Minerva
+# Dear Me
 
 **English** · [中文](README.zh-TW.md)
 
-> 🌐 **Live showcase / 線上展示頁 → https://srichsun.github.io/Minerva/**
+> 🌐 **Live showcase / 線上展示頁 → https://srichsun.github.io/dearme/**
 >
 > 🚀 **Live app / 線上試用 → https://daily-coach-592904365774.asia-east1.run.app/**
 
 **An AI journal for energy, wins, and gratitude.** One day, one page. Write it,
 read it back, and watch what the weeks are actually made of.
 
-Minerva is not a chatbot you talk to all day. You write the day down once, rate
+Dear Me is not a chatbot you talk to all day. You write the day down once, rate
 your energy, and press one button. It pulls out what you won and what you were
 grateful for, files them into a memory that grows, and draws your energy over
 time — so the pattern you can't see from inside a hard week is obvious from a
@@ -22,7 +22,7 @@ the record grow forever while every prompt stays a fixed, bounded size.
 
 A general chatbot forgets you the moment the tab closes. Feeding it your whole
 history every turn is expensive and eventually overflows the context window.
-Minerva splits memory into three layers, each answering a different question:
+Dear Me splits memory into three layers, each answering a different question:
 
 | Layer | Backed by | Answers | AI? |
 |-------|-----------|---------|-----|
@@ -49,7 +49,7 @@ and 3 keep only a fixed slice of it.
 ```
 
 **No arrow points back up.** Asking questions writes nothing: no entry, no
-fact, no profile update. What Minerva knows comes from what you sat down and
+fact, no profile update. What it knows comes from what you sat down and
 wrote, never from what you said in passing. That isn't a rule the code keeps
 to — the call doesn't exist on that path, and a test deliberately leaves the
 fact extractor unmocked so that adding one back fails loudly.
