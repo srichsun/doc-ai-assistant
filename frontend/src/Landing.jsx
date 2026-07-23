@@ -66,7 +66,7 @@ export default function Landing() {
 
       <header className="lhero">
         <div className="lmark">◈</div>
-        <h1>Dear Me</h1>
+        <h1>Dear Myself</h1>
         <p className="llede">{t(COPY.lede)}</p>
         <button className="primary" onClick={() => signInWithGoogle()}>
           {t(COPY.cta)}

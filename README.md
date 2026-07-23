@@ -1,4 +1,4 @@
-# Dear Me
+# Dear Myself
 
 **English** · [中文](README.zh-TW.md)
 
@@ -9,7 +9,7 @@
 **An AI journal for energy, wins, and gratitude.** One day, one page. Write it,
 read it back, and watch what the weeks are actually made of.
 
-Dear Me is not a chatbot you talk to all day. You write the day down once, rate
+Dear Myself is not a chatbot you talk to all day. You write the day down once, rate
 your energy, and press one button. It pulls out what you won and what you were
 grateful for, files them into a memory that grows, and draws your energy over
 time — so the pattern you can't see from inside a hard week is obvious from a
@@ -22,7 +22,7 @@ the record grow forever while every prompt stays a fixed, bounded size.
 
 A general chatbot forgets you the moment the tab closes. Feeding it your whole
 history every turn is expensive and eventually overflows the context window.
-Dear Me splits memory into three layers, each answering a different question:
+Dear Myself splits memory into three layers, each answering a different question:
 
 | Layer | Backed by | Answers | AI? |
 |-------|-----------|---------|-----|

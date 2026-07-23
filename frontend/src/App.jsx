@@ -57,7 +57,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="head">
-        <h1>Dear Me</h1>
+        <h1>Dear Myself</h1>
         <button className="signout" onClick={() => signOutUser()}>
           Sign out
         </button>
